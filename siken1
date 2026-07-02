@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP4 メタデータクリーナー</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .drop-zone {
+            border: 3px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+        .drop-zone:hover,
+        .drop-zone.active {
+            background: #e8ebff;
+            border-color: #764ba2;
+        }
+        .drop-zone p {
+            color: #666;
+            font-size: 16px;
+            margin: 0;
+        }
+        input[type="file"] { display: none; }
+        .file-input-label {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+        .file-input-label:hover {
+            background: #764ba2;
+        }
+        .options {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 8px;
+        }
+        .option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .option input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .option label {
+            cursor: pointer;
+            flex: 1;
+        }
+        .option label strong {
+            display: block;
+            color: #333;
+            margin-bottom: 3px;
+        }
+        .option label span {
+            color: #666;
+            font-size: 13px;
+        }
+        .process-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s ease;
+        }
+        .process-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+        .process-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .progress {
+            margin-top: 20px;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 6px;
+            color: #155724;
+            display: none;
+        }
+        .error {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 6px;
+            color: #721c24;
+            display: none;
+        }
+        .download-btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            transition: background 0.3s ease;
+        }
+        .download-btn:hover {
+            background: #218838;
+        }
+        .file-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 6px;
+            color: #004085;
+            font-size: 13px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 MP4 メタデータクリーナー</h1>
+        <p class="subtitle">不要なメタデータを削除してファイルサイズを最適化します</p>
+
+        <div class="drop-zone" id="dropZone">
+            <p>📁 MP4ファイルをドラッグ＆ドロップ</p>
+            <label class="file-input-label">
+                ファイルを選択
+                <input type="file" id="fileInput" accept=".mp4" />
+            </label>
+        </div>
+
+        <div class="file-info" id="fileInfo"></div>
+
+        <div class="options">
+            <h3 style="color: #333; margin-bottom: 15px; font-size: 16px;">🔧 クリーニングオプション</h3>
+            
+            <div class="option">
+                <input type="checkbox" id="removeMetadata" checked />
+                <label for="removeMetadata">
+                    <strong>メタデータ削除</strong>
+                    <span>タイトル、作成者、コメント等を削除</span>
+                </label>
+            </div>
+
+            <div class="option">
+                <input type="checkbox" id="removeSubtitles" checked />
+                <label for="removeSubtitles">
+                    <strong>字幕トラック削除</strong>
+                    <span>すべての字幕ストリームを削除</span>
+                </label>
+            </div>
+
+            <div class="option">
+                <input type="checkbox" id="removeAudioTracks" />
+                <label for="removeAudioTracks">
+                    <strong>副音声削除</strong>
+                    <span>最初の音声トラック以外を削除（最初は保持）</span>
+                </label>
+            </div>
+
+            <div class="option">
+                <input type="checkbox" id="optimizeFragmentation" checked />
+                <label for="optimizeFragmentation">
+                    <strong>ファイル構造最適化</strong>
+                    <span>mp4boxの最適化フラグを適用</span>
+                </label>
+            </div>
+        </div>
+
+        <button class="process-btn" id="processBtn" disabled>⚡ クリーニング開始</button>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">準備中...</div>
+        </div>
+
+        <div class="result" id="result"></div>
+        <div class="error" id="error"></div>
+    </div>
+
+    <script async src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/FFmpeg.js"></script>
+    <script>
+        const { FFmpeg, fetchFile } = FFmpeg;
+        const ffmpeg = new FFmpeg.FFmpeg();
+
+        let selectedFile = null;
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const progress = document.getElementById('progress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const resultDiv = document.getElementById('result');
+        const errorDiv = document.getElementById('error');
+        const fileInfo = document.getElementById('fileInfo');
+
+        // ドラッグ&ドロップ
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('active');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('active');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('active');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        function handleFile(file) {
+            if (!file || !file.name.endsWith('.mp4')) {
+                showError('MP4ファイルを選択してください');
+                return;
+            }
+            selectedFile = file;
+            processBtn.disabled = false;
+            showFileInfo(file);
+            resultDiv.style.display = 'none';
+            errorDiv.style.display = 'none';
+        }
+
+        function showFileInfo(file) {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            fileInfo.innerHTML = `<strong>📊 ファイル情報</strong><br>名前: ${file.name}<br>サイズ: ${sizeMB} MB`;
+            fileInfo.style.display = 'block';
+        }
+
+        async function initFFmpeg() {
+            if (ffmpeg.isLoaded()) return;
+            progressText.textContent = 'FFmpegを初期化中...';
+            progress.style.display = 'block';
+            try {
+                await ffmpeg.load();
+            } catch (err) {
+                throw new Error('FFmpegの初期化に失敗: ' + err.message);
+            }
+        }
+
+        function showProgress(message, percent) {
+            progressText.textContent = message;
+            progressFill.style.width = percent + '%';
+        }
+
+        function showResult(originalSize, newSize, filename) {
+            const reduction = ((1 - newSize / originalSize) * 100).toFixed(1);
+            resultDiv.innerHTML = `
+                <strong>✅ クリーニング完了！</strong><br>
+                元のサイズ: ${(originalSize / (1024 * 1024)).toFixed(2)} MB<br>
+                新しいサイズ: ${(newSize / (1024 * 1024)).toFixed(2)} MB<br>
+                削減: <strong>${reduction}%</strong><br>
+                <a href="#" class="download-btn" onclick="downloadFile(); return false;">📥 ダウンロード</a>
+            `;
+            resultDiv.style.display = 'block';
+        }
+
+        function showError(message) {
+            errorDiv.textContent = '❌ エラー: ' + message;
+            errorDiv.style.display = 'block';
+        }
+
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            try {
+                processBtn.disabled = true;
+                resultDiv.style.display = 'none';
+                errorDiv.style.display = 'none';
+
+                await initFFmpeg();
+
+                showProgress('ファイルを読み込み中...', 10);
+                await ffmpeg.writeFile('input.mp4', await fetchFile(selectedFile));
+
+                showProgress('フォーマット情報を取得中...', 20);
+                let ffmpegCmd = ['-i', 'input.mp4'];
+
+                showProgress('FFmpegコマンド構築中...', 30);
+                ffmpegCmd = [
+                    '-i', 'input.mp4',
+                    '-c', 'copy',  // 再エンコードなし（品質保証）
+                ];
+
+                // メタデータ削除
+                if (document.getElementById('removeMetadata').checked) {
+                    ffmpegCmd.push('-map_metadata', '-1');
+                }
+
+                // 字幕削除
+                if (document.getElementById('removeSubtitles').checked) {
+                    ffmpegCmd.push('-sn');
+                }
+
+                // 副音声削除
+                if (document.getElementById('removeAudioTracks').checked) {
+                    ffmpegCmd.push('-map', '0:v:0', '-map', '0:a:0?');
+                }
+
+                ffmpegCmd.push('output.mp4');
+
+                showProgress('MP4をクリーニング中...', 50);
+                
+                // FFmpegの進捗を監視
+                ffmpeg.setProgress(({ ratio }) => {
+                    const percent = Math.round(50 + ratio * 40);
+                    showProgress('クリーニング処理中...', percent);
+                });
+
+                await ffmpeg.exec(ffmpegCmd);
+
+                showProgress('ファイルを準備中...', 95);
+                const data = await ffmpeg.readFile('output.mp4');
+                const blob = new Blob([data.buffer], { type: 'video/mp4' });
+
+                // グローバルに保存（ダウンロード時に使用）
+                window.cleanedFile = blob;
+                window.cleanedFilename = 'cleaned_' + selectedFile.name;
+
+                await ffmpeg.deleteFile('input.mp4');
+                await ffmpeg.deleteFile('output.mp4');
+
+                showProgress('完了！', 100);
+                showResult(selectedFile.size, blob.size, window.cleanedFilename);
+                progress.style.display = 'none';
+
+            } catch (err) {
+                showError(err.message);
+                progress.style.display = 'none';
+            } finally {
+                processBtn.disabled = false;
+            }
+        });
+        function downloadFile() {
+            if (!window.cleanedFile) return;
+            const url = URL.createObjectURL(window.cleanedFile);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = window.cleanedFilename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
