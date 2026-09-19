@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iPWM → CryptPass 変換ツール</title>
+<script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#0f172a;--panel:#1e293b;--text:#f8fafc;--muted:#94a3b8;--accent:#3b82f6;--border:#334155;--ok:#10b981;--err:#ef4444}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif;padding:24px}
+main{max-width:720px;margin:auto;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:0 12px 35px #0008}
+h1{font-size:1.35rem;margin:0 0 8px}
+p{color:var(--muted);line-height:1.6}
+.step{margin-top:20px;padding:18px;border:1px solid var(--border);border-radius:10px}
+label{display:block;margin:12px 0 6px;font-weight:600}
+input[type=password],input[type=file]{width:100%;padding:11px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text)}
+button{width:100%;padding:11px;margin-top:16px;border:0;border-radius:7px;background:var(--accent);color:white;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+.status{white-space:pre-wrap;margin-top:16px;padding:12px;border-radius:8px;background:var(--bg);font-family:ui-monospace,monospace;font-size:.9rem}
+.ok{border:1px solid var(--ok);color:#a7f3d0}.err{border:1px solid var(--err);color:#fecaca}
+.warning{font-size:.85rem;color:#fbbf24}
+small{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>iPWM → CryptPass 変換ツール</h1>
+<p>
+iPWM+siken のバックアップJSONを復号し、
+CryptPass (<code>cryptovault.v1</code>) の暗号化バックアップJSONへ変換します。
+処理はブラウザ内だけで行い、パスワードや復号済みデータをサーバーへ送信しません。
+</p>
+
+<div class="step">
+<h2>1. iPWMバックアップ</h2>
+<input id="file" type="file" accept=".json,application/json">
+</div>
+
+<div class="step">
+<h2>2. パスワード</h2>
+<label for="oldPass">iPWMのマスターパスワード</label>
+<input id="oldPass" type="password" autocomplete="current-password">
+
+<label for="newPass">CryptPassのマスターパスワード</label>
+<input id="newPass" type="password" autocomplete="new-password">
+
+<label for="newPass2">CryptPassのマスターパスワード（確認）</label>
+<input id="newPass2" type="password" autocomplete="new-password">
+
+<button id="convert">変換してダウンロード</button>
+<div id="status" class="status">待機中</div>
+</div>
+
+<p class="warning">
+注意: 変換後はCryptPass側で新しいマスターパスワードを使用します。
+元のiPWMパスワードはCryptPassのパスワードとしては引き継ぎません。
+</p>
+</main>
+
+<script>
+"use strict";
+
+const enc = new TextEncoder();
+
+function b64(buf) {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s);
+}
+
+function unb64(s) {
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function setStatus(message, type = "") {
+  const el = document.getElementById("status");
+  el.textContent = message;
+  el.className = "status " + type;
+}
+
+async function deriveOldKey(password, salt) {
+  if (!window.argon2) throw new Error("Argon2ライブラリを読み込めませんでした。インターネット接続を確認してください。");
+
+  const result = await argon2.hash({
+    pass: password,
+    salt: salt,
+    time: 3,
+    mem: 1024 * 32,
+    hashLen: 32,
+    type: argon2.argon2id
+  });
+
+  return crypto.subtle.importKey(
+    "raw",
+    result.hash,
+    { name: "AES-GCM" },
+    false,
+    ["decrypt"]
+  );
+}
+
+async function decryptOldBackup(data, password) {
+  if (!data || !data.salt || !data.iv || !data.cipher) {
+    throw new Error("iPWM形式ではありません。salt / iv / cipher が必要です。");
+  }
+
+  const salt = unb64(data.salt);
+  const iv = unb64(data.iv);
+  const cipher = unb64(data.cipher);
+
+  const key = await deriveOldKey(password, salt);
+
+  let plain;
+  try {
+    plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      cipher
+    );
+  } catch {
+    throw new Error("iPWMの復号に失敗しました。マスターパスワードが正しいか確認してください。");
+  }
+
+  let vault;
+  try {
+    vault = JSON.parse(new TextDecoder().decode(plain));
+  } catch {
+    throw new Error("iPWMデータのJSON復号結果が不正です。");
+  }
+
+  if (!vault || !Array.isArray(vault.items)) {
+    throw new Error("復号後のiPWMデータに items がありません。");
+  }
+
+  return vault;
+}
+
+async function deriveNewKey(password, salt, iterations = 310000) {
+  const base = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+}
+
+async function encryptJSON(key, data) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    enc.encode(JSON.stringify(data))
+  );
+  return { iv: b64(iv), ct: b64(ct) };
+}
+
+function makeCryptPassData(oldVault) {
+  const now = Date.now();
+
+  const entries = oldVault.items.map((item, index) => {
+    const app = String(item?.app ?? "");
+    const email = String(item?.email ?? "");
+    const pass = String(item?.pass ?? "");
+
+    return {
+      id: b64(crypto.getRandomValues(new Uint8Array(12)))
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .slice(0, 12) || String(now + index),
+
+      title: app || "(名称なし)",
+      url: "",
+      email: email,
+      username: email,
+      password: pass,
+      totp: "",
+      note: "",
+      favorite: false,
+      createdAt: now,
+      updatedAt: now
+    };
+  });
+
+  return {
+    entries,
+    settings: {
+      requirePassword: true,
+      sortOrder: "updated",
+      sortDir: "desc",
+      autoLockMinutes: 5,
+      clipboardClearSeconds: 20,
+      hidePasswords: true,
+      theme: "dark",
+      serverSyncEnabled: false,
+      serverUrl: "",
+      serverToken: "",
+      lockOnBlur: false,
+      offsetTop: 0,
+      offsetBottom: 0,
+      offsetLeft: 0,
+      offsetRight: 0
+    }
+  };
+}
+
+async function convert() {
+  const file = document.getElementById("file").files[0];
+  const oldPass = document.getElementById("oldPass").value;
+  const newPass = document.getElementById("newPass").value;
+  const newPass2 = document.getElementById("newPass2").value;
+  const btn = document.getElementById("convert");
+
+  if (!file) {
+    setStatus("iPWMのバックアップJSONを選択してください。", "err");
+    return;
+  }
+  if (!oldPass) {
+    setStatus("iPWMのマスターパスワードを入力してください。", "err");
+    return;
+  }
+  if (newPass.length < 1) {
+    setStatus("CryptPassのマスターパスワードを入力してください。", "err");
+    return;
+  }
+  if (newPass !== newPass2) {
+    setStatus("CryptPassのマスターパスワードが一致しません。", "err");
+    return;
+  }
+
+  btn.disabled = true;
+
+  try {
+    setStatus("iPWMバックアップを読み込んでいます…");
+
+    const source = JSON.parse(await file.text());
+
+    setStatus("iPWMのArgon2id鍵を生成して復号しています…");
+    const oldVault = await decryptOldBackup(source, oldPass);
+
+    setStatus(`${oldVault.items.length}件をCryptPass形式へ変換しています…`);
+
+    const newData = makeCryptPassData(oldVault);
+
+    const iterations = 310000;
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+
+    setStatus("CryptPass用のPBKDF2鍵を生成しています…");
+    const key = await deriveNewKey(newPass, salt, iterations);
+
+    const payload = await encryptJSON(key, newData);
+
+    const backup = {
+      v: 1,
+      salt: b64(salt),
+      iterations,
+      requirePassword: true,
+      payload
+    };
+
+    const blob = new Blob(
+      [JSON.stringify(backup, null, 2)],
+      { type: "application/json" }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cryptovault-converted-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    setStatus(
+      `変換完了。\n${newData.entries.length}件をCryptPass形式へ変換しました。\n\n` +
+      "ダウンロードされたJSONをCryptPassの「バックアップを読み込む」から読み込んでください。",
+      "ok"
+    );
+  } catch (err) {
+    console.error(err);
+    setStatus("変換失敗:\n" + (err?.message || String(err)), "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("convert").addEventListener("click", convert);
+</script>
+</body>
+</html>
