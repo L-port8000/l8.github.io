@@ -1,17 +1,16 @@
 <!doctype html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1"
-    />
-    <meta name="theme-color" content="#0c0f12" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22CryptPass%22%2C%22short_name%22%3A%22CryptPass%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230c0f12%22%2C%22theme_color%22%3A%22%230c0f12%22%2C%22start_url%22%3A%22.%22%7D" />
-    <title>CryptPass — ローカル暗号化パスワードマネージャ</title>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta id="theme-color" name="theme-color" content="#f2f2f7">
+  <title>Crypt Pass</title>
+  <link rel="icon" href="cryptpass.png">
+  <link rel="apple-touch-icon" href="https://l8.f5.si/cryptpass.png">
+  <meta name="apple-mobile-web-app-title" content="CryptPass">
     <style>
       :root {
         --bg: #0c0f12;
@@ -27,6 +26,14 @@
         --glow: rgba(0, 247, 130, 0.16);
         --gridline: rgba(0, 247, 130, 0.045);
         --fab-bottom: 84px;
+        --offset-top: 0px;
+        --offset-bottom: 0px;
+        --offset-left: 0px;
+        --offset-right: 0px;
+        --offset-pad-top: 0px;
+        --offset-pad-bottom: 0px;
+        --offset-pad-left: 0px;
+        --offset-pad-right: 0px;
         color-scheme: dark;
       }
       .theme-light {
@@ -48,6 +55,12 @@
         :root {
           --fab-bottom: 32px;
         }
+      }
+      .offset-applied {
+        padding-top: var(--offset-top);
+        padding-bottom: var(--offset-bottom);
+        padding-left: var(--offset-left);
+        padding-right: var(--offset-right);
       }
 
       *, *::before, *::after {
@@ -363,13 +376,13 @@
       }
       .header-bar {
         position: sticky;
-        top: 0;
+        top: calc(var(--offset-top) - 4px);
         z-index: 30;
         background: rgba(12, 15, 18, 0.85);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         border-bottom: 1px solid var(--border);
-        padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px;
+        padding: calc(env(safe-area-inset-top, 0px) + 10px + var(--offset-top)) calc(14px + var(--offset-left)) calc(10px + var(--offset-bottom)) calc(14px + var(--offset-right));
         display: flex;
         align-items: center;
         gap: 10px;
@@ -383,21 +396,66 @@
       .content-area {
         max-width: 1024px;
         width: 100%;
-        margin: 0 auto;
+        margin: calc(var(--offset-top) * 0) auto 0;
         flex: 1;
-        padding: 6px 12px 110px;
+        padding-top: calc(6px + var(--offset-top));
+        padding-bottom: calc(110px + var(--offset-bottom));
+        padding-left: calc(12px + var(--offset-left));
+        padding-right: calc(12px + var(--offset-right));
       }
       @media (min-width: 768px) {
         .content-area {
-          padding: 10px 24px 32px;
+          padding-top: calc(10px + var(--offset-top));
+          padding-bottom: calc(32px + var(--offset-bottom));
+          padding-left: calc(24px + var(--offset-left));
+          padding-right: calc(24px + var(--offset-right));
         }
       }
 
+      /* Offset controls (PWA adjustments) */
+      .offset-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+      }
+      .offset-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .offset-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--panel2);
+        color: var(--muted);
+        display: inline-grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 13px;
+        line-height: 1;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        user-select: none;
+      }
+      .offset-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+      .offset-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+      .offset-value {
+        font-family: ui-monospace, monospace;
+        font-weight: 700;
+        min-width: 28px;
+        text-align: center;
+        font-size: 13px;
+      }
       /* FAB Session Style */
       .fab-btn {
         position: fixed;
-        left: 50%;
-        bottom: calc(env(safe-area-inset-bottom, 0px) + var(--fab-bottom));
+        left: calc(50% + var(--offset-left) / 2);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + var(--fab-bottom) + var(--offset-bottom));
         transform: translateX(-50%);
         width: 56px;
         height: 56px;
@@ -857,7 +915,11 @@
         serverSyncEnabled: false,
         serverUrl: "",
         serverToken: "",
-        lockOnBlur: false
+        lockOnBlur: false,
+        offsetTop: 0,
+        offsetBottom: 0,
+        offsetLeft: 0,
+        offsetRight: 0
       };
 
       const uid = () => b64(randomBytes(12)).replace(/[^a-zA-Z0-9]/g, "").slice(0, 12);
@@ -1608,6 +1670,52 @@
                   ${icon("sun", 14)} ライト
                 </button>
               </div>
+
+              <!-- PWA Offset Controls -->
+              <div class="panel" style="padding: 18px; margin-top: 14px;">
+                <h3 style="font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                  <span style="color: var(--accent); display: flex;">${icon("settings", 14)}</span>
+                  画面余白の調整 (PWA対応)
+                </h3>
+                <p style="font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 4px;">
+                  PWA表示時にコンテンツが上・下・左・右に隠れる場合、ピクセル単位で余白を調整できます。0に戻すとリセットします。
+                </p>
+                <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                  <div>
+                    <div class="offset-label">上 (px)</div>
+                    <div class="offset-row">
+                      <button class="offset-btn" data-offset-dir="top" data-offset-delta="-4">−</button>
+                      <span class="offset-value" id="offset-top-val">${(state.data?.settings?.offsetTop || 0) + "px"}</span>
+                      <button class="offset-btn" data-offset-dir="top" data-offset-delta="4">+</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="offset-label">下 (px)</div>
+                    <div class="offset-row">
+                      <button class="offset-btn" data-offset-dir="bottom" data-offset-delta="-4">−</button>
+                      <span class="offset-value" id="offset-bottom-val">${(state.data?.settings?.offsetBottom || 0) + "px"}</span>
+                      <button class="offset-btn" data-offset-dir="bottom" data-offset-delta="4">+</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="offset-label">左 (px)</div>
+                    <div class="offset-row">
+                      <button class="offset-btn" data-offset-dir="left" data-offset-delta="-4">−</button>
+                      <span class="offset-value" id="offset-left-val">${(state.data?.settings?.offsetLeft || 0) + "px"}</span>
+                      <button class="offset-btn" data-offset-dir="left" data-offset-delta="4">+</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="offset-label">右 (px)</div>
+                    <div class="offset-row">
+                      <button class="offset-btn" data-offset-dir="right" data-offset-delta="-4">−</button>
+                      <span class="offset-value" id="offset-right-val">${(state.data?.settings?.offsetRight || 0) + "px"}</span>
+                      <button class="offset-btn" data-offset-dir="right" data-offset-delta="4">+</button>
+                    </div>
+                  </div>
+                </div>
+                <button class="btn btn-ghost" id="offset-reset-btn" style="margin-top: 10px; font-size: 12px;">余白をリセット (すべて 0 に戻す)</button>
+              </div>
             </div>
 
             <!-- Self-host Sync -->
@@ -2256,6 +2364,42 @@
           if (themeLight) {
             themeLight.onclick = () => saveVault({ ...state.data, settings: { ...state.data.settings, theme: "light" } });
           }
+
+          /* Offset buttons for PWA adjustments */
+          document.querySelectorAll(".offset-btn").forEach((btn) => {
+            btn.onclick = () => {
+              const delta = parseInt(btn.getAttribute("data-offset-delta"), 10) || 0;
+              const dir = btn.getAttribute("data-offset-dir");
+              const updates = {};
+              if (dir === "top") updates.offsetTop = Math.max(0, (state.data?.settings?.offsetTop || 0) + delta);
+              if (dir === "bottom") updates.offsetBottom = Math.max(0, (state.data?.settings?.offsetBottom || 0) + delta);
+              if (dir === "left") updates.offsetLeft = Math.max(0, (state.data?.settings?.offsetLeft || 0) + delta);
+              if (dir === "right") updates.offsetRight = Math.max(0, (state.data?.settings?.offsetRight || 0) + delta);
+              saveVault({ ...state.data, settings: { ...state.data.settings, ...updates } });
+            };
+          });
+
+          const offsetResetBtn = document.getElementById("offset-reset-btn");
+          const applyOffsetCSS = () => {
+    const s = state.data?.settings || defaultSettings;
+    document.documentElement.style.setProperty("--offset-top", (s.offsetTop || 0) + "px");
+    document.documentElement.style.setProperty("--offset-bottom", (s.offsetBottom || 0) + "px");
+    document.documentElement.style.setProperty("--offset-left", (s.offsetLeft || 0) + "px");
+    document.documentElement.style.setProperty("--offset-right", (s.offsetRight || 0) + "px");
+  };
+  applyOffsetCSS();
+  // Reapply after any vault data change so offsets take effect immediately
+  const originalSaveVault = saveVault;
+  saveVault = async function(nextData) {
+    await originalSaveVault(nextData);
+    applyOffsetCSS();
+  };
+
+  if (offsetResetBtn) {
+    offsetResetBtn.onclick = () => {
+      saveVault({ ...state.data, settings: { ...state.data.settings, offsetTop: 0, offsetBottom: 0, offsetLeft: 0, offsetRight: 0 } });
+    };
+  }
 
           const syncEnabled = document.getElementById("setting-sync-enabled");
           if (syncEnabled) {
