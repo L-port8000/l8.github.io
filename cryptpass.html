@@ -1,0 +1,2355 @@
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1"
+    />
+    <meta name="theme-color" content="#0c0f12" />
+    <title>CryptoPass — ローカル暗号化パスワードマネージャ</title>
+    <style>
+      :root {
+        --bg: #0c0f12;
+        --bg2: #101418;
+        --panel: #151a20;
+        --panel2: #1b222b;
+        --border: #232c37;
+        --text: #e7edf3;
+        --muted: #77879a;
+        --accent: #00f782;
+        --accent-ink: #03140b;
+        --danger: #ff5c57;
+        --glow: rgba(0, 247, 130, 0.16);
+        --gridline: rgba(0, 247, 130, 0.045);
+        --fab-bottom: 84px;
+        color-scheme: dark;
+      }
+      .theme-light {
+        --bg: #f1f4f3;
+        --bg2: #e8edeb;
+        --panel: #ffffff;
+        --panel2: #f4f7f6;
+        --border: #d8e0dd;
+        --text: #12211b;
+        --muted: #5c7269;
+        --accent: #00b864;
+        --accent-ink: #ffffff;
+        --danger: #e5484d;
+        --glow: rgba(0, 184, 100, 0.16);
+        --gridline: rgba(0, 184, 100, 0.06);
+        color-scheme: light;
+      }
+      @media (min-width: 768px) {
+        :root {
+          --fab-bottom: 32px;
+        }
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        height: 100%;
+        overflow-x: hidden;
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        min-height: 100%;
+        margin: 0;
+        overflow-x: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Hiragino Sans", "Noto Sans JP", sans-serif;
+        line-height: 1.5;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+      ::selection {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+      input, textarea, select, button {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 99px;
+      }
+
+      .ambient-grid {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: linear-gradient(to right, var(--gridline) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--gridline) 1px, transparent 1px);
+        background-size: 38px 38px;
+        mask-image: radial-gradient(ellipse 95% 75% at 50% 0%, black 15%, transparent 80%);
+        -webkit-mask-image: radial-gradient(ellipse 95% 75% at 50% 0%, black 15%, transparent 80%);
+        z-index: 0;
+      }
+      .ambient-glow {
+        position: fixed;
+        top: -180px;
+        left: 50%;
+        width: 720px;
+        height: 440px;
+        transform: translateX(-50%);
+        border-radius: 50%;
+        background: var(--accent);
+        opacity: 0.06;
+        filter: blur(120px);
+        pointer-events: none;
+        z-index: 0;
+        animation: glowBreathe 7s ease-in-out infinite;
+      }
+
+      @keyframes glowBreathe {
+        0%, 100% { opacity: 0.05; transform: translateX(-50%) scale(1); }
+        50% { opacity: 0.09; transform: translateX(-50%) scale(1.08); }
+      }
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes modalPop {
+        from { opacity: 0; transform: translateY(14px) scale(0.97); }
+        to { opacity: 1; transform: none; }
+      }
+      @keyframes pingSoft {
+        0% { transform: scale(1); opacity: 0.55; }
+        70%, 100% { transform: scale(1.55); opacity: 0; }
+      }
+      @keyframes toastIn {
+        from { opacity: 0; transform: translate(-50%, 14px); }
+        to { opacity: 1; transform: translate(-50%, 0); }
+      }
+
+      .anim-fade-up {
+        animation: fadeUp 0.3s cubic-bezier(0.22, 0.68, 0.31, 1) both;
+      }
+      .anim-modal {
+        animation: modalPop 0.25s cubic-bezier(0.22, 0.68, 0.31, 1) both;
+      }
+      .anim-toast {
+        animation: toastIn 0.25s cubic-bezier(0.22, 0.68, 0.31, 1) both;
+      }
+
+      mark.hl {
+        background: rgba(0, 247, 130, 0.24);
+        color: var(--accent);
+        font-weight: 700;
+        padding: 0 1px;
+        border-radius: 3px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      .input-text {
+        width: 100%;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg2);
+        padding: 9px 12px;
+        font-size: 13.5px;
+        color: var(--text);
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      .input-text:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--glow);
+      }
+      .input-text::placeholder {
+        color: var(--muted);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13px;
+        padding: 8px 14px;
+        transition: all 0.15s ease;
+        user-select: none;
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+      .btn-primary:hover:not(:disabled) {
+        filter: brightness(1.1);
+        box-shadow: 0 4px 20px var(--glow);
+      }
+      .btn-soft {
+        background: var(--panel2);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .btn-soft:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .btn-ghost {
+        color: var(--muted);
+      }
+      .btn-ghost:hover:not(:disabled) {
+        color: var(--text);
+        background: var(--panel2);
+      }
+      .btn-danger {
+        background: rgba(255, 92, 87, 0.12);
+        color: var(--danger);
+        border: 1px solid rgba(255, 92, 87, 0.4);
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: rgba(255, 92, 87, 0.22);
+      }
+
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+        display: inline-grid;
+        place-items: center;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel2);
+        color: var(--muted);
+        transition: all 0.15s;
+        flex-shrink: 0;
+      }
+      .icon-btn:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .icon-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      .copy-val-box {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 36px;
+        min-width: 0;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--bg2);
+        padding: 0 8px;
+        text-align: left;
+        transition: border-color 0.15s, transform 0.1s;
+      }
+      .copy-val-box.active {
+        cursor: pointer;
+      }
+      .copy-val-box.active:hover {
+        border-color: var(--accent);
+      }
+      .copy-val-box.active:hover .copy-val-text {
+        color: var(--accent);
+      }
+      .copy-val-box.active:hover .copy-val-icon {
+        color: var(--accent);
+      }
+      .copy-val-box.active:active {
+        transform: scale(0.98);
+      }
+      .copy-val-box.disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .copy-val-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .copy-val-lbl {
+        display: block;
+        font-size: 8.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        line-height: 1;
+      }
+      .copy-val-text {
+        display: block;
+        font-size: 11px;
+        font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+        line-height: 1.2;
+        margin-top: 2px;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: color 0.15s;
+      }
+      .copy-val-icon {
+        color: var(--muted);
+        flex-shrink: 0;
+        transition: color 0.15s;
+      }
+
+      #app {
+        position: relative;
+        z-index: 10;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .app-layout {
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+      }
+      .sidebar {
+        display: none;
+        width: 256px;
+        flex-shrink: 0;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
+        border-right: 1px solid var(--border);
+        background: rgba(16, 20, 24, 0.85);
+        backdrop-filter: blur(12px);
+        flex-direction: column;
+        padding: 24px 16px 16px;
+      }
+      @media (min-width: 768px) {
+        .sidebar {
+          display: flex;
+        }
+      }
+
+      .main-content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .header-bar {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        background: rgba(12, 15, 18, 0.85);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      @media (min-width: 768px) {
+        .header-bar {
+          padding: 10px 24px;
+        }
+      }
+
+      .content-area {
+        max-width: 1024px;
+        width: 100%;
+        margin: 0 auto;
+        flex: 1;
+        padding: 6px 12px 110px;
+      }
+      @media (min-width: 768px) {
+        .content-area {
+          padding: 10px 24px 32px;
+        }
+      }
+
+      .fab-btn {
+        position: fixed;
+        left: 50%;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + var(--fab-bottom));
+        transform: translateX(-50%);
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        box-shadow: 0 8px 32px var(--glow), 0 4px 16px rgba(0,0,0,0.4);
+        z-index: 40;
+        transition: transform 0.2s, filter 0.2s;
+      }
+      .fab-btn:hover {
+        transform: translateX(-50%) scale(1.06);
+        filter: brightness(1.1);
+      }
+      .fab-btn:active {
+        transform: translateX(-50%) scale(0.95);
+      }
+      .fab-ping {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: rgba(0, 247, 130, 0.35);
+        pointer-events: none;
+        animation: pingSoft 2.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+      }
+      @media (min-width: 768px) {
+        .fab-btn {
+          left: auto;
+          right: 32px;
+          transform: none;
+        }
+        .fab-btn:hover {
+          transform: scale(1.06);
+        }
+        .fab-btn:active {
+          transform: scale(0.95);
+        }
+      }
+
+      .mobile-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 30;
+        background: rgba(16, 20, 24, 0.92);
+        backdrop-filter: blur(12px);
+        border-top: 1px solid var(--border);
+        display: flex;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      @media (min-width: 768px) {
+        .mobile-nav {
+          display: none;
+        }
+      }
+      .mobile-nav-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 9px 0;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--muted);
+        transition: color 0.15s;
+      }
+      .mobile-nav-btn.active {
+        color: var(--accent);
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        background: rgba(0, 0, 0, 0.72);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 0;
+      }
+      @media (min-width: 640px) {
+        .modal-backdrop {
+          align-items: center;
+          padding: 24px;
+        }
+      }
+      .modal-box {
+        width: 100%;
+        max-width: 540px;
+        max-height: 90vh;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-top-left-radius: 16px;
+        border-top-right-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+      }
+      @media (min-width: 640px) {
+        .modal-box {
+          border-radius: 16px;
+        }
+      }
+      .modal-box.wide {
+        max-width: 760px;
+      }
+      .modal-header {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .modal-body {
+        padding: 16px 18px calc(env(safe-area-inset-bottom, 0px) + 20px);
+        overflow-y: auto;
+      }
+
+      .toast-box {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 150;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 16px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+        font-size: 13px;
+        white-space: nowrap;
+        max-width: calc(100vw - 32px);
+      }
+
+      .entry-row {
+        position: relative;
+        overflow: hidden;
+        transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+      }
+      @media (min-width: 640px) {
+        .entry-row {
+          padding: 10px 14px;
+        }
+      }
+      .entry-row:hover {
+        border-color: var(--accent);
+        box-shadow: 0 8px 28px var(--glow);
+      }
+      .entry-indicator {
+        position: absolute;
+        inset-block: 0;
+        left: 0;
+        width: 3px;
+        background: var(--accent);
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+      .entry-row:hover .entry-indicator {
+        opacity: 1;
+      }
+
+      .entry-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+      }
+      @media (min-width: 1024px) {
+        .entry-grid {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+      }
+      .entry-title-btn {
+        display: flex;
+        flex-direction: column;
+        text-align: left;
+        min-width: 0;
+      }
+      @media (min-width: 1024px) {
+        .entry-title-btn {
+          width: 170px;
+          flex-shrink: 0;
+        }
+      }
+      .entry-title-text {
+        font-size: 13.5px;
+        font-weight: 700;
+        line-height: 1.25;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: color 0.15s;
+      }
+      .entry-row:hover .entry-title-text {
+        color: var(--accent);
+      }
+      .entry-sub-text {
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1;
+        margin-top: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .entry-copies {
+        grid-column: span 2;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+      @media (min-width: 1024px) {
+        .entry-copies {
+          display: flex;
+          flex: 1;
+          min-width: 0;
+        }
+      }
+      .entry-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ambient-grid"></div>
+    <div class="ambient-glow"></div>
+
+    <div id="app"></div>
+
+    <script>
+      const enc = new TextEncoder();
+      const dec = new TextDecoder();
+
+      const b64 = (buf) => {
+        const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+        let s = "";
+        bytes.forEach((b) => (s += String.fromCharCode(b)));
+        return btoa(s);
+      };
+
+      const unb64 = (s) => {
+        const bin = atob(s);
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return arr;
+      };
+
+      const randomBytes = (n) => crypto.getRandomValues(new Uint8Array(n));
+
+      async function deriveKey(password, salt, iterations = 310000) {
+        const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+        return crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+          base,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["encrypt", "decrypt"]
+        );
+      }
+
+      async function encryptJSON(key, data) {
+        const iv = randomBytes(12);
+        const ct = await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv },
+          key,
+          enc.encode(JSON.stringify(data))
+        );
+        return { iv: b64(iv), ct: b64(ct) };
+      }
+
+      async function decryptJSON(key, payload) {
+        const pt = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: unb64(payload.iv) },
+          key,
+          unb64(payload.ct)
+        );
+        return JSON.parse(dec.decode(pt));
+      }
+
+      function generatePassword(len = 20) {
+        const pool = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*()-_=+[]{}";
+        const rnd = crypto.getRandomValues(new Uint32Array(len));
+        let out = "";
+        for (let i = 0; i < len; i++) out += pool[rnd[i] % pool.length];
+        return out;
+      }
+
+      function base32Decode(input) {
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        const clean = (input || "").replace(/=+$/, "").replace(/\s/g, "").toUpperCase();
+        let bits = 0, value = 0;
+        const out = [];
+        for (const c of clean) {
+          const idx = alphabet.indexOf(c);
+          if (idx === -1) continue;
+          value = (value << 5) | idx;
+          bits += 5;
+          if (bits >= 8) {
+            out.push((value >>> (bits - 8)) & 0xff);
+            bits -= 8;
+          }
+        }
+        return new Uint8Array(out);
+      }
+
+      function parseTotpSecret(raw) {
+        const s = (raw || "").trim();
+        if (s.toLowerCase().startsWith("otpauth://")) {
+          try {
+            const u = new URL(s);
+            return u.searchParams.get("secret") || "";
+          } catch {
+            return "";
+          }
+        }
+        return s;
+      }
+
+      async function computeTotp(secret, period = 30, digits = 6) {
+        const key = base32Decode(parseTotpSecret(secret));
+        if (!key.length) return "------";
+        const counter = Math.floor(Date.now() / 1000 / period);
+        const buf = new ArrayBuffer(8);
+        const view = new DataView(buf);
+        view.setUint32(0, Math.floor(counter / 2 ** 32));
+        view.setUint32(4, counter >>> 0);
+        const ck = await crypto.subtle.importKey(
+          "raw",
+          key,
+          { name: "HMAC", hash: "SHA-1" },
+          false,
+          ["sign"]
+        );
+        const sig = new Uint8Array(await crypto.subtle.sign("HMAC", ck, buf));
+        const offset = sig[sig.length - 1] & 0xf;
+        const code =
+          (((sig[offset] & 0x7f) << 24) |
+            (sig[offset + 1] << 16) |
+            (sig[offset + 2] << 8) |
+            sig[offset + 3]) %
+          10 ** digits;
+        return code.toString().padStart(digits, "0");
+      }
+
+      const totpRemaining = (period = 30) => period - (Math.floor(Date.now() / 1000) % period);
+
+      const ICONS = {
+        logo: '<path d="M12 2.2 20 5.1v6.2c0 5.2-3.4 8.9-8 10.5-4.6-1.6-8-5.3-8-10.5V5.1Z"/><circle cx="12" cy="10.2" r="2.3"/><path d="M12 12.5v3.6"/>',
+        search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
+        plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+        settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+        lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        lockOpen: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+        key: '<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
+        shieldCheck: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+        copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+        pencil: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
+        trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+        eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+        eyeOff: '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+        refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+        star: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
+        check: '<path d="M20 6 9 17l-5-5"/>',
+        x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+        zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+        alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 20h16a2 2 0 0 0 1.73-2"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+        chevronDown: '<path d="m6 9 6 6 6-6"/>',
+        arrowUp: '<path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>',
+        arrowDown: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+        moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+        sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+        upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+        download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+        globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+        github: '<path fill="currentColor" stroke="none" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>',
+        external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'
+      };
+
+      function icon(name, size = 16, strokeWidth = 2, extraClass = "") {
+        const body = ICONS[name] || "";
+        return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${extraClass}" aria-hidden="true">${body}</svg>`;
+      }
+
+      function escapeHtml(s) {
+        return String(s || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function highlight(text, query) {
+        const str = String(text || "");
+        const needle = (query || "").trim();
+        if (!needle) return escapeHtml(str);
+        const idx = str.toLowerCase().indexOf(needle.toLowerCase());
+        if (idx === -1) return escapeHtml(str);
+        const before = escapeHtml(str.slice(0, idx));
+        const match = escapeHtml(str.slice(idx, idx + needle.length));
+        const after = escapeHtml(str.slice(idx + needle.length));
+        return `${before}<mark class="hl">${match}</mark>${after}`;
+      }
+
+      const STORAGE_KEY = "cryptoPass.v1";
+      const loadRaw = () => {
+        try {
+          const s = localStorage.getItem(STORAGE_KEY);
+          return s ? JSON.parse(s) : null;
+        } catch {
+          return null;
+        }
+      };
+      const saveRaw = (v) => localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
+      const wipeVault = () => localStorage.removeItem(STORAGE_KEY);
+      const existsVault = () => !!localStorage.getItem(STORAGE_KEY);
+
+      const defaultSettings = {
+        requirePassword: true,
+        sortOrder: "updated",
+        sortDir: "desc",
+        autoLockMinutes: 5,
+        clipboardClearSeconds: 20,
+        hidePasswords: true,
+        theme: "dark",
+        serverSyncEnabled: false,
+        serverUrl: "",
+        serverToken: "",
+        lockOnBlur: false
+      };
+
+      const uid = () => b64(randomBytes(12)).replace(/[^a-zA-Z0-9]/g, "").slice(0, 12);
+
+      let state = {
+        hasVault: existsVault(),
+        cryptoKey: null,
+        data: null,
+        screen: "list", // 'list' | 'settings'
+        query: "",
+        sortOpen: false,
+        selectedEntry: null,
+        editingEntry: null,
+        confirmDialog: null,
+        toastMsg: "",
+        toastTimer: null,
+        clipboardTimer: null,
+        autoLockTimer: null,
+        totpTimer: null,
+        totpCache: {} // entryId -> { code, remaining }
+      };
+
+      function updateTheme() {
+        const theme = state.data?.settings?.theme || "dark";
+        document.documentElement.className = theme === "light" ? "theme-light" : "";
+      }
+
+      function showToast(msg) {
+        state.toastMsg = msg;
+        clearTimeout(state.toastTimer);
+        render();
+        state.toastTimer = setTimeout(() => {
+          state.toastMsg = "";
+          render();
+        }, 2600);
+      }
+
+      async function copyText(value, label = "値") {
+        if (!value) return;
+        try {
+          await navigator.clipboard.writeText(value);
+          clearTimeout(state.clipboardTimer);
+          showToast(`${label}をコピーしました`);
+          const sec = state.data?.settings?.clipboardClearSeconds || 0;
+          if (sec > 0) {
+            state.clipboardTimer = setTimeout(() => {
+              navigator.clipboard.writeText("").catch(() => {});
+            }, sec * 1000);
+          }
+        } catch {
+          showToast("コピーできませんでした");
+        }
+      }
+
+      function lock() {
+        state.cryptoKey = null;
+        state.data = null;
+        state.selectedEntry = null;
+        state.editingEntry = null;
+        state.confirmDialog = null;
+        state.screen = "list";
+        render();
+      }
+
+      async function saveVault(nextData) {
+        state.data = nextData;
+        if (state.cryptoKey) {
+          const raw = loadRaw();
+          if (raw) {
+            raw.payload = await encryptJSON(state.cryptoKey, nextData);
+            raw.requirePassword = nextData.settings.requirePassword;
+            saveRaw(raw);
+          }
+        }
+        updateTheme();
+        render();
+      }
+
+      async function rekeyVault(newPassword) {
+        const salt = randomBytes(16);
+        const deviceSecret = newPassword === null ? b64(randomBytes(32)) : undefined;
+        const key = await deriveKey(newPassword ?? deviceSecret, salt, 310000);
+        const nextData = {
+          ...state.data,
+          settings: { ...state.data.settings, requirePassword: newPassword !== null }
+        };
+        const payload = await encryptJSON(key, nextData);
+        saveRaw({
+          v: 1,
+          salt: b64(salt),
+          iterations: 310000,
+          requirePassword: newPassword !== null,
+          deviceSecret,
+          payload
+        });
+        state.cryptoKey = key;
+        state.data = nextData;
+        render();
+      }
+
+      async function createNewVault(password) {
+        const salt = randomBytes(16);
+        const deviceSecret = password === null ? b64(randomBytes(32)) : undefined;
+        const key = await deriveKey(password ?? deviceSecret, salt, 310000);
+        const data = {
+          entries: [],
+          settings: { ...defaultSettings, requirePassword: password !== null }
+        };
+        const payload = await encryptJSON(key, data);
+        saveRaw({
+          v: 1,
+          salt: b64(salt),
+          iterations: 310000,
+          requirePassword: password !== null,
+          deviceSecret,
+          payload
+        });
+        state.hasVault = true;
+        state.cryptoKey = key;
+        state.data = data;
+        updateTheme();
+        render();
+      }
+
+      async function unlockVault(password) {
+        const raw = loadRaw();
+        if (!raw) throw new Error("no vault");
+        const secret = raw.requirePassword ? password ?? "" : raw.deviceSecret;
+        const key = await deriveKey(secret, unb64(raw.salt), raw.iterations);
+        const data = await decryptJSON(key, raw.payload);
+        state.cryptoKey = key;
+        state.data = data;
+        updateTheme();
+        render();
+      }
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && state.data?.settings?.lockOnBlur) {
+          lock();
+        }
+      });
+
+      const resetIdleTimer = () => {
+        if (!state.data) return;
+        const mins = state.data.settings.autoLockMinutes;
+        if (!mins) return;
+        clearTimeout(state.autoLockTimer);
+        state.autoLockTimer = setTimeout(lock, mins * 60000);
+      };
+      ["mousemove", "keydown", "click", "touchstart"].forEach((e) =>
+        window.addEventListener(e, resetIdleTimer)
+      );
+
+      setInterval(async () => {
+        if (!state.data) return;
+        let changed = false;
+        for (const entry of state.data.entries) {
+          if (entry.totp && entry.totp.trim()) {
+            const code = await computeTotp(entry.totp);
+            const remaining = totpRemaining();
+            state.totpCache[entry.id] = { code, remaining };
+            changed = true;
+          }
+        }
+        if (changed) {
+          // update any visible totp badges without full re-render
+          document.querySelectorAll("[data-totp-entry]").forEach((el) => {
+            const id = el.getAttribute("data-totp-entry");
+            const cached = state.totpCache[id];
+            if (cached) {
+              const codeEl = el.querySelector(".totp-code");
+              const secEl = el.querySelector(".totp-sec");
+              if (codeEl) codeEl.textContent = `${cached.code.slice(0, 3)} ${cached.code.slice(3)}`;
+              if (secEl) secEl.textContent = `${cached.remaining}s`;
+            }
+          });
+        }
+      }, 1000);
+      function confirmAction(options) {
+        state.confirmDialog = options;
+        render();
+      }
+
+      const appEl = document.getElementById("app");
+
+      function render() {
+        if (!state.hasVault) {
+          renderSetup();
+          return;
+        }
+        if (!state.cryptoKey || !state.data) {
+          renderUnlock();
+          return;
+        }
+        renderMain();
+      }
+
+      function renderSetup() {
+        appEl.innerHTML = `
+          <div style="min-height: 100vh; display: grid; place-items: center; padding: 20px;">
+            <div class="anim-fade-up" style="width: 100%; max-width: 380px;">
+              <div style="text-align: center; margin-bottom: 24px;">
+                <div style="width: 64px; height: 64px; border-radius: 16px; background: var(--accent); color: var(--accent-ink); display: inline-grid; place-items: center; box-shadow: 0 0 40px var(--glow);">
+                  ${icon("logo", 34, 1.8)}
+                </div>
+                <div style="margin-top: 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.24em; color: var(--accent);">End-to-End Encrypted</div>
+                <h1 style="font-size: 22px; font-weight: 800; margin-top: 4px;">CryptoPass</h1>
+                <p style="font-size: 13px; color: var(--muted); margin-top: 4px;">新しい保管庫を作成します</p>
+              </div>
+
+              <div class="panel" style="padding: 20px;">
+                <form id="setup-form" style="display: flex; flex-direction: column; gap: 12px;">
+                  <input type="password" id="setup-pw1" class="input-text" placeholder="マスターパスワード" autofocus />
+                  <input type="password" id="setup-pw2" class="input-text" placeholder="もう一度入力" />
+                  <button type="submit" class="btn btn-primary" id="setup-submit-btn" style="width: 100%;">
+                    ${icon("lock", 15)} 保管庫を作成
+                  </button>
+                  <button type="button" class="btn btn-ghost" id="setup-nopw-btn" style="width: 100%;">
+                    パスワードなしで始める(あとで設定可)
+                  </button>
+                  <div style="display: flex; gap: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg2); padding: 10px; margin-top: 4px;">
+                    <div style="color: var(--accent); flex-shrink: 0; margin-top: 2px;">${icon("alert", 15)}</div>
+                    <p style="font-size: 11px; color: var(--muted); line-height: 1.45;">
+                      マスターパスワードは保存されず、復旧手段もありません。忘れるとデータは復号できません。
+                    </p>
+                  </div>
+                </form>
+              </div>
+
+              <p style="text-align: center; font-size: 11px; color: var(--muted); margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                ${icon("shieldCheck", 12)} AES-GCM-256 · PBKDF2-SHA256 310k · ブラウザ内で完結
+              </p>
+            </div>
+          </div>
+        `;
+
+        const form = document.getElementById("setup-form");
+        const pw1 = document.getElementById("setup-pw1");
+        const pw2 = document.getElementById("setup-pw2");
+        const btn = document.getElementById("setup-submit-btn");
+        const noPwBtn = document.getElementById("setup-nopw-btn");
+
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          if (pw1.value.length < 4 || pw1.value !== pw2.value) {
+            const errEl = document.createElement("div");
+            errEl.style.cssText = "color: var(--danger); font-size: 12px; margin-top: 4px; text-align: center;";
+            errEl.textContent = "パスワードが一致しないか4文字未満です";
+            const prev = form.querySelector(".setup-err");
+            if (prev) prev.remove();
+            errEl.className = "setup-err";
+            form.insertBefore(errEl, btn);
+            return;
+          }
+          btn.disabled = true;
+          btn.innerHTML = `${icon("refresh", 15)} 鍵を生成中…`;
+          await createNewVault(pw1.value);
+        };
+
+        noPwBtn.onclick = async () => {
+          noPwBtn.disabled = true;
+          await createNewVault(null);
+        };
+      }
+
+      function renderUnlock() {
+        const raw = loadRaw();
+        const needsPw = !!raw?.requirePassword;
+
+        if (!needsPw) {
+          unlockVault(null).catch(() => {});
+          appEl.innerHTML = `
+            <div style="min-height: 100vh; display: grid; place-items: center; font-size: 13px; color: var(--muted);">
+              復号しています…
+            </div>
+          `;
+          return;
+        }
+
+        appEl.innerHTML = `
+          <div style="min-height: 100vh; display: grid; place-items: center; padding: 20px;">
+            <div class="anim-fade-up" style="width: 100%; max-width: 380px;">
+              <div style="text-align: center; margin-bottom: 24px;">
+                <div style="width: 64px; height: 64px; border-radius: 16px; background: var(--accent); color: var(--accent-ink); display: inline-grid; place-items: center; box-shadow: 0 0 40px var(--glow);">
+                  ${icon("logo", 34, 1.8)}
+                </div>
+                <div style="margin-top: 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.24em; color: var(--accent);">End-to-End Encrypted</div>
+                <h1 style="font-size: 22px; font-weight: 800; margin-top: 4px;">CryptoPass</h1>
+                <p style="font-size: 13px; color: var(--muted); margin-top: 4px;">マスターパスワードでロックを解除</p>
+              </div>
+
+              <div class="panel" style="padding: 20px;">
+                <form id="unlock-form" style="display: flex; flex-direction: column; gap: 12px;">
+                  <input type="password" id="unlock-pw" class="input-text" placeholder="マスターパスワード" autofocus />
+                  <div id="unlock-err" style="display: none; color: var(--danger); font-size: 12px; align-items: center; gap: 6px;">
+                    ${icon("alert", 13)} パスワードが違います
+                  </div>
+                  <button type="submit" class="btn btn-primary" id="unlock-btn" style="width: 100%;">
+                    ${icon("lockOpen", 15)} ロック解除
+                  </button>
+                  <button type="button" id="unlock-forgot-btn" style="width: 100%; font-size: 11px; color: var(--muted); padding: 6px 0; text-align: center; transition: color 0.15s;">
+                    パスワードを忘れた → 保管庫を削除してやり直す
+                  </button>
+                </form>
+              </div>
+
+              <p style="text-align: center; font-size: 11px; color: var(--muted); margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                ${icon("shieldCheck", 12)} AES-GCM-256 · PBKDF2-SHA256 310k · ブラウザ内で完結
+              </p>
+            </div>
+          </div>
+        `;
+
+        const form = document.getElementById("unlock-form");
+        const pw = document.getElementById("unlock-pw");
+        const btn = document.getElementById("unlock-btn");
+        const err = document.getElementById("unlock-err");
+        const forgot = document.getElementById("unlock-forgot-btn");
+
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          if (!pw.value) return;
+          btn.disabled = true;
+          btn.innerHTML = `${icon("refresh", 15)} 復号中…`;
+          err.style.display = "none";
+          try {
+            await unlockVault(pw.value);
+          } catch {
+            err.style.display = "flex";
+            btn.disabled = false;
+            btn.innerHTML = `${icon("lockOpen", 15)} ロック解除`;
+            pw.focus();
+            pw.select();
+          }
+        };
+
+        forgot.onclick = () => {
+          confirmAction({
+            title: "保管庫を完全に削除する",
+            message: "この端末に保存された暗号化データをすべて削除します。パスワードを忘れている場合、データを復旧することはできません。この操作は取り消せません。",
+            confirmLabel: "すべて削除する",
+            danger: true,
+            onConfirm: () => {
+              wipeVault();
+              state.hasVault = false;
+              render();
+            }
+          });
+        };
+      }
+
+      function getSortedEntries() {
+        const list = state.data?.entries || [];
+        const q = state.query.trim().toLowerCase();
+        const filtered = q
+          ? list.filter((e) =>
+              [e.title, e.url, e.email, e.username, e.note].join(" ").toLowerCase().includes(q)
+            )
+          : list;
+        const mode = state.data?.settings?.sortOrder || "updated";
+        const dir = state.data?.settings?.sortDir || "desc";
+
+        return [...filtered].sort((a, b) => {
+          const f = Number(!!b.favorite) - Number(!!a.favorite);
+          if (f) return f;
+          const c =
+            mode === "title"
+              ? a.title.localeCompare(b.title, "ja")
+              : a.updatedAt - b.updatedAt;
+          return dir === "asc" ? c : -c;
+        });
+      }
+
+      function renderMain() {
+        const canLock = !!state.data.settings.requirePassword;
+        const entries = getSortedEntries();
+        const sortMode = state.data.settings.sortOrder || "updated";
+        const sortDir = state.data.settings.sortDir || "desc";
+
+        const sortLabels = {
+          updated: "更新順",
+          title: "名前順",
+          oldest: "古い順"
+        };
+
+        appEl.innerHTML = `
+          <div class="app-layout">
+            <!-- Sidebar (Desktop) -->
+            <aside class="sidebar">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px;">
+                <div style="width: 38px; height: 38px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; box-shadow: 0 0 24px var(--glow); flex-shrink: 0;">
+                  ${icon("logo", 20, 1.8)}
+                </div>
+                <div>
+                  <div style="font-size: 16px; font-weight: 800; line-height: 1;">CryptoPass</div>
+                  <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.22em; color: var(--accent); margin-top: 4px;">E2E Encrypted</div>
+                </div>
+              </div>
+
+              <nav style="display: flex; flex-direction: column; gap: 4px;">
+                <button class="nav-item ${state.screen === "list" ? "active" : ""}" id="nav-btn-list" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; text-align: left; transition: all 0.15s; ${state.screen === "list" ? "background: rgba(0,247,130,0.1); color: var(--accent);" : "color: var(--muted);"}">
+                  ${icon("key", 17)}
+                  <span>保管庫</span>
+                  <span style="margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--panel2); color: var(--muted); font-weight: 700;">${state.data.entries.length}</span>
+                </button>
+                <button class="nav-item ${state.screen === "settings" ? "active" : ""}" id="nav-btn-settings" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; text-align: left; transition: all 0.15s; ${state.screen === "settings" ? "background: rgba(0,247,130,0.1); color: var(--accent);" : "color: var(--muted);"}">
+                  ${icon("settings", 17)}
+                  <span>設定</span>
+                </button>
+              </nav>
+
+              <div style="margin-top: auto; display: flex; flex-direction: column; gap: 12px;">
+                <div class="panel" style="padding: 12px;">
+                  <div style="display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: 11.5px; font-weight: 700;">
+                    ${icon("shieldCheck", 14)} 暗号化: 有効
+                  </div>
+                  <p style="font-size: 10.5px; color: var(--muted); line-height: 1.45; margin-top: 4px;">
+                    AES-GCM-256 / PBKDF2<br />データは端末から出ません
+                  </p>
+                </div>
+
+                <button class="btn btn-soft" id="sidebar-lock-btn" style="width: 100%;" ${canLock ? "" : "disabled"} title="${canLock ? "保管庫をロック" : "マスターパスワードを設定している場合のみロックできます"}">
+                  ${icon(canLock ? "lock" : "lockOpen", 15)} ロック
+                </button>
+              </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <div class="main-content">
+              <header class="header-bar">
+                <div style="width: 34px; height: 34px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; flex-shrink: 0;" class="md-hidden">
+                  ${icon("logo", 18, 1.8)}
+                </div>
+
+                <h1 style="font-size: 17px; font-weight: 800; display: none;" class="md-block">
+                  ${state.screen === "list" ? "保管庫" : "設定"}
+                </h1>
+
+                ${
+                  state.screen === "list"
+                    ? `
+                  <div style="position: relative; flex: 1; min-width: 0; max-width: 420px; margin-left: 4px;">
+                    <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; display: flex;">
+                      ${icon("search", 15)}
+                    </span>
+                    <input type="text" id="search-input" class="input-text" style="padding-left: 34px; height: 36px;" placeholder="サイト・メール・メモを検索…" value="${escapeHtml(state.query)}" />
+                  </div>
+                `
+                    : `
+                  <h1 style="font-size: 16px; font-weight: 800;" class="md-hidden">設定</h1>
+                `
+                }
+
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+                  <button class="icon-btn md-hidden" id="mobile-lock-btn" ${canLock ? "" : "disabled"} title="${canLock ? "ロック" : "マスターパスワードを設定している場合のみロックできます"}">
+                    ${icon(canLock ? "lock" : "lockOpen", 16)}
+                  </button>
+                </div>
+              </header>
+
+              <main class="content-area">
+                ${state.screen === "settings" ? renderSettingsContent() : renderListContent(entries, sortMode, sortDir)}
+              </main>
+            </div>
+          </div>
+
+          <!-- Session Style Circular FAB (+) -->
+          ${
+            state.screen === "list"
+              ? `
+            <button class="fab-btn" id="fab-add-btn" aria-label="新規追加" title="新規追加">
+              <span class="fab-ping"></span>
+              ${icon("plus", 26, 2.4, "relative")}
+            </button>
+          `
+              : ""
+          }
+
+          <!-- Mobile Tab Bar -->
+          <nav class="mobile-nav">
+            <button class="mobile-nav-btn ${state.screen === "list" ? "active" : ""}" id="tab-btn-list">
+              ${icon("key", 19)}
+              <span>保管庫</span>
+            </button>
+            <button class="mobile-nav-btn ${state.screen === "settings" ? "active" : ""}" id="tab-btn-settings">
+              ${icon("settings", 19)}
+              <span>設定</span>
+            </button>
+          </nav>
+
+          <!-- Modals & Dialogs -->
+          ${renderActiveModals()}
+
+          <!-- Toast -->
+          ${
+            state.toastMsg
+              ? `
+            <div class="toast-box anim-toast">
+              <span style="color: var(--accent); display: flex;">${icon("check", 15)}</span>
+              <span>${escapeHtml(state.toastMsg)}</span>
+            </div>
+          `
+              : ""
+          }
+        `;
+
+        bindMainEvents();
+      }
+
+      function renderListContent(entries, sortMode, sortDir) {
+        const sortLabels = { updated: "更新順", title: "名前順", oldest: "古い順" };
+
+        return `
+          <div class="anim-fade-up">
+            <!-- Inline Header Row: "保管庫 ○ 件のデータ" + "並び替え ∨ + ↑↓" on the SAME row -->
+            <div style="position: relative; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; ${state.sortOpen ? "z-index: 100;" : ""}">
+              <div style="display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1;">
+                <h2 style="font-size: 14.5px; font-weight: 800; color: var(--text); flex-shrink: 0;" class="md-hidden">保管庫</h2>
+                <span style="font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${state.query ? `「${escapeHtml(state.query)}」${entries.length}件` : `${state.data.entries.length} 件のデータ`}
+                </span>
+              </div>
+
+              <!-- Sort controls on the top right -->
+              <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                <div style="position: relative;">
+                  <button id="sort-dropdown-btn" class="btn btn-soft" style="padding: 5px 10px; font-size: 11.5px; height: 30px; display: flex; align-items: center; gap: 4px; ${state.sortOpen ? "border-color: var(--accent); color: var(--accent); background: rgba(0,247,130,0.1);" : ""}">
+                    <span style="font-size: 10px; text-transform: uppercase; color: var(--muted);" class="hidden-xs">並び替え</span>
+                    <span style="font-weight: 700;">${sortLabels[sortMode] || "更新順"}</span>
+                    <span style="display: flex; transform: ${state.sortOpen ? "rotate(180deg)" : "none"}; transition: transform 0.2s;">
+                      ${icon("chevronDown", 12)}
+                    </span>
+                  </button>
+
+                  ${
+                    state.sortOpen
+                      ? `
+                    <div id="sort-backdrop" style="position: fixed; inset: 0; z-index: 110; background: transparent;"></div>
+                    <div class="anim-modal panel" style="position: absolute; right: 0; top: calc(100% + 6px); z-index: 120; width: 160px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.5);">
+                      <div style="padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);">
+                        並び替え
+                      </div>
+                      ${["updated", "title", "oldest"]
+                        .map((m) => {
+                          const active = sortMode === m;
+                          return `
+                          <button class="sort-opt-btn" data-sort="${m}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; font-size: 12.5px; text-align: left; transition: background 0.15s; ${active ? "color: var(--accent); font-weight: 700;" : "color: var(--text);"}">
+                            <span>${sortLabels[m]}</span>
+                            ${active ? icon("check", 13) : ""}
+                          </button>
+                        `;
+                        })
+                        .join("")}
+                    </div>
+                  `
+                      : ""
+                  }
+                </div>
+
+                <button class="icon-btn" id="sort-dir-btn" style="width: 30px; height: 30px;" title="現在: ${sortDir === "asc" ? "昇順 (クリックで降順に)" : "降順 (クリックで昇順に)"}">
+                  ${icon(sortDir === "asc" ? "arrowUp" : "arrowDown", 13)}
+                </button>
+              </div>
+            </div>
+
+            <!-- List of elongated items -->
+            ${
+              entries.length === 0
+                ? `
+              <div class="panel" style="padding: 48px 20px; text-align: center; margin-top: 10px;">
+                <p style="font-size: 14px; font-weight: 600; color: var(--text);">
+                  ${state.query ? "一致する項目がありません" : "保管庫はまだ空です"}
+                </p>
+                <p style="font-size: 12px; color: var(--muted); margin-top: 4px;">
+                  ${state.query ? "別のキーワードで試してください" : "画面右下の ＋ ボタンから最初のデータを暗号化して保存しましょう"}
+                </p>
+              </div>
+            `
+                : `
+              <div style="display: flex; flex-direction: column;">
+                ${entries.map((e) => renderEntryRow(e)).join("")}
+              </div>
+            `
+            }
+          </div>
+        `;
+      }
+
+      function renderEntryRow(e) {
+        const cached = state.totpCache[e.id];
+        const totpCode = cached ? `${cached.code.slice(0, 3)} ${cached.code.slice(3)}` : "------";
+        const totpSec = cached ? `${cached.remaining}s` : "";
+
+        return `
+          <div class="panel entry-row" data-id="${e.id}">
+            <div class="entry-indicator"></div>
+            <div class="entry-grid">
+              <!-- Site Title / Sub text (click to view detail) -->
+              <button class="entry-title-btn" data-action="view" data-id="${e.id}">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="entry-title-text">${highlight(e.title, state.query)}</span>
+                  ${e.favorite ? `<span style="color: var(--accent); display: flex;">${icon("star", 11, 2, "fill-accent")}</span>` : ""}
+                </div>
+                <div class="entry-sub-text">
+                  ${e.url ? highlight(e.url.replace(/^https?:\/\//, ""), state.query) : "詳細を表示"}
+                </div>
+              </button>
+
+              <!-- 3 Unified Copy Boxes: Email, Username, Password (masked) -->
+              <div class="entry-copies">
+                <!-- Email -->
+                <button class="copy-val-box ${e.email ? "active" : "disabled"}" data-action="copy" data-val="${escapeHtml(e.email)}" data-lbl="メールアドレス" ${e.email ? "" : "disabled"}>
+                  <div class="copy-val-info">
+                    <span class="copy-val-lbl">メール</span>
+                    <span class="copy-val-text">${e.email ? highlight(e.email, state.query) : "未登録"}</span>
+                  </div>
+                  <span class="copy-val-icon">${icon("copy", 11)}</span>
+                </button>
+
+                <!-- Username -->
+                <button class="copy-val-box ${e.username ? "active" : "disabled"}" data-action="copy" data-val="${escapeHtml(e.username)}" data-lbl="ユーザー名" ${e.username ? "" : "disabled"}>
+                  <div class="copy-val-info">
+                    <span class="copy-val-lbl">ユーザー名</span>
+                    <span class="copy-val-text">${e.username ? highlight(e.username, state.query) : "未登録"}</span>
+                  </div>
+                  <span class="copy-val-icon">${icon("copy", 11)}</span>
+                </button>
+
+                <!-- Password (masked as ••••••••, copies real password) -->
+                <button class="copy-val-box ${e.password ? "active" : "disabled"}" data-action="copy" data-val="${escapeHtml(e.password)}" data-lbl="パスワード" ${e.password ? "" : "disabled"}>
+                  <div class="copy-val-info">
+                    <span class="copy-val-lbl">パスワード</span>
+                    <span class="copy-val-text" style="letter-spacing: 0.15em;">${e.password ? "••••••••" : "未登録"}</span>
+                  </div>
+                  <span class="copy-val-icon">${icon("copy", 11)}</span>
+                </button>
+              </div>
+
+              <!-- Action buttons -->
+              <div class="entry-actions">
+                ${
+                  e.totp && e.totp.trim()
+                    ? `
+                  <button class="icon-btn" style="width: auto; padding: 0 8px; font-size: 11px; font-weight: 700; color: var(--accent); background: rgba(0,247,130,0.1); border-color: rgba(0,247,130,0.3); display: flex; align-items: center; gap: 4px;" data-totp-entry="${e.id}" data-action="copy-totp" data-id="${e.id}" title="2FAコードをコピー">
+                    ${icon("zap", 11)}
+                    <span class="totp-code font-mono">${totpCode}</span>
+                    <span class="totp-sec" style="font-size: 9px; opacity: 0.7;">${totpSec}</span>
+                  </button>
+                `
+                    : ""
+                }
+
+                <button class="icon-btn" data-action="favorite" data-id="${e.id}" title="お気に入り" style="${e.favorite ? "color: var(--accent); border-color: rgba(0,247,130,0.4);" : ""}">
+                  ${icon("star", 13, 2, e.favorite ? "fill-accent" : "")}
+                </button>
+                <button class="icon-btn" data-action="edit" data-id="${e.id}" title="編集">
+                  ${icon("pencil", 13)}
+                </button>
+                <button class="icon-btn" data-action="delete" data-id="${e.id}" title="削除">
+                  ${icon("trash", 13)}
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderSettingsContent() {
+        const s = state.data.settings;
+        const SERVER_REPO = "https://github.com/cryptopass-selfhost/cryptopass-server";
+
+        return `
+          <div class="anim-fade-up" style="max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;">
+            <!-- Master Password -->
+            <div class="panel" style="padding: 18px;">
+              <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                <span style="color: var(--accent); display: flex; margin-top: 2px;">${icon("key", 17)}</span>
+                <div>
+                  <h3 style="font-size: 14px; font-weight: 700;">マスターパスワード</h3>
+                  <p style="font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 2px;">
+                    PBKDF2-SHA256 (310,000回) で導出した鍵でAES-GCM-256暗号化します。
+                  </p>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--border);">
+                <div>
+                  <div style="font-size: 13.5px; font-weight: 600;">アプリを開くときにパスワードを要求する</div>
+                  <div style="font-size: 11.5px; color: var(--muted); margin-top: 2px;">
+                    オフにすると端末内のデバイス鍵で自動復号します (利便性優先)。
+                  </div>
+                </div>
+                <input type="checkbox" id="setting-require-pw" ${s.requirePassword ? "checked" : ""} style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;" />
+              </div>
+
+              <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                  <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">新しいパスワード</div>
+                  <input type="password" id="setting-new-pw1" class="input-text" placeholder="4文字以上" />
+                </div>
+                <div>
+                  <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">確認のため再入力</div>
+                  <input type="password" id="setting-new-pw2" class="input-text" placeholder="もう一度入力" />
+                </div>
+              </div>
+
+              <button class="btn btn-primary" id="setting-update-pw-btn" style="margin-top: 12px;">
+                ${icon("shieldCheck", 14)} パスワードを設定して再暗号化
+              </button>
+            </div>
+
+            <!-- Lock and Display -->
+            <div class="panel" style="padding: 18px;">
+              <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                <span style="color: var(--accent); display: flex; margin-top: 2px;">${icon("lock", 17)}</span>
+                <div>
+                  <h3 style="font-size: 14px; font-weight: 700;">ロックと表示</h3>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+                <span style="font-size: 13px;">タブを離れたら即ロック</span>
+                <input type="checkbox" id="setting-lock-blur" ${s.lockOnBlur ? "checked" : ""} style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;" />
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 10px;">
+                <div>
+                  <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">自動ロック (分)</div>
+                  <input type="number" min="0" id="setting-autolock" class="input-text" value="${s.autoLockMinutes}" />
+                </div>
+                <div>
+                  <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">クリップボード自動消去 (秒)</div>
+                  <input type="number" min="0" id="setting-clipclear" class="input-text" value="${s.clipboardClearSeconds}" />
+                </div>
+              </div>
+
+              <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <button class="btn ${s.theme === "dark" ? "btn-primary" : "btn-soft"}" id="theme-dark-btn" style="padding: 6px 12px;">
+                  ${icon("moon", 14)} ダーク
+                </button>
+                <button class="btn ${s.theme === "light" ? "btn-primary" : "btn-soft"}" id="theme-light-btn" style="padding: 6px 12px;">
+                  ${icon("sun", 14)} ライト
+                </button>
+              </div>
+            </div>
+
+            <!-- Self-host Sync -->
+            <div class="panel" style="padding: 18px;">
+              <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+                <span style="color: var(--accent); display: flex; margin-top: 2px;">${icon("globe", 17)}</span>
+                <div>
+                  <h3 style="font-size: 14px; font-weight: 700;">独自サーバへの保存 (E2E 同期)</h3>
+                  <p style="font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 2px;">
+                    サーバへ送信されるのは暗号化blobのみ。鍵は端末から出ません。
+                  </p>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid var(--border);">
+                <span style="font-size: 13px;">独自サーバ同期を有効にする</span>
+                <input type="checkbox" id="setting-sync-enabled" ${s.serverSyncEnabled ? "checked" : ""} style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;" />
+              </div>
+
+              ${
+                s.serverSyncEnabled
+                  ? `
+                <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">サーバ URL</div>
+                    <input type="text" id="setting-server-url" class="input-text" value="${escapeHtml(s.serverUrl)}" placeholder="https://vault.example.com" />
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">アクセストークン (任意)</div>
+                    <input type="password" id="setting-server-token" class="input-text" value="${escapeHtml(s.serverToken)}" />
+                  </div>
+                  <div style="display: flex; gap: 8px; margin-top: 4px;">
+                    <button class="btn btn-soft" id="sync-upload-btn">
+                      ${icon("upload", 14)} アップロード
+                    </button>
+                    <button class="btn btn-soft" id="sync-download-btn">
+                      ${icon("download", 14)} ダウンロード
+                    </button>
+                  </div>
+                </div>
+              `
+                  : ""
+              }
+
+              <a href="${SERVER_REPO}" target="_blank" rel="noreferrer" class="btn btn-soft" style="margin-top: 12px; width: 100%; display: flex; justify-content: flex-start; text-decoration: none; font-size: 12.5px;">
+                ${icon("github", 15)} サーバの建て方 (GitHub)
+                <span style="margin-left: auto; color: var(--muted);">${icon("external", 13)}</span>
+              </a>
+            </div>
+
+            <!-- Backup -->
+            <div class="panel" style="padding: 18px;">
+              <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <span style="color: var(--accent); display: flex; margin-top: 2px;">${icon("download", 17)}</span>
+                <div>
+                  <h3 style="font-size: 14px; font-weight: 700;">バックアップ</h3>
+                  <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">暗号化されたままの安全なファイルです。</p>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-soft" id="export-backup-btn">
+                  ${icon("download", 14)} 暗号化バックアップを書き出す
+                </button>
+                <label class="btn btn-soft" style="cursor: pointer;">
+                  ${icon("upload", 14)} バックアップを読み込む
+                  <input type="file" id="import-backup-file" accept="application/json" style="display: none;" />
+                </label>
+              </div>
+            </div>
+
+            <!-- Delete Account -->
+            <div class="panel" style="padding: 18px;">
+              <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+                <span style="color: var(--danger); display: flex; margin-top: 2px;">${icon("alert", 17)}</span>
+                <div>
+                  <h3 style="font-size: 14px; font-weight: 700; color: var(--danger);">アカウントの削除</h3>
+                  <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">この端末に保存されたデータを完全に消去します。取り消せません。</p>
+                </div>
+              </div>
+              <div style="margin-top: 8px;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">確認のため DELETE と入力</div>
+                <input type="text" id="delete-confirm-input" class="input-text font-mono" placeholder="DELETE" />
+              </div>
+              <button class="btn btn-danger" id="delete-all-btn" style="margin-top: 10px;" disabled>
+                ${icon("trash", 14)} すべて削除する
+              </button>
+            </div>
+
+            <p style="text-align: center; font-size: 11px; color: var(--muted); line-height: 1.5; padding-bottom: 20px;">
+              すべての処理はブラウザ内で完結します。サーバへ平文が送信されることはありません。<br />
+              AES-GCM-256 / PBKDF2-SHA256 310,000 iterations / WebCrypto
+            </p>
+          </div>
+        `;
+      }
+
+      function renderActiveModals() {
+        let out = "";
+
+        // Detail View Modal
+        if (state.selectedEntry) {
+          const e = state.selectedEntry;
+          const cached = state.totpCache[e.id];
+          const totpCode = cached ? `${cached.code.slice(0, 3)} ${cached.code.slice(3)}` : "------";
+
+          out += `
+            <div class="modal-backdrop" id="modal-detail-backdrop">
+              <div class="modal-box anim-modal">
+                <div class="modal-header">
+                  <h2 style="font-size: 15px; font-weight: 800;">${escapeHtml(e.title)}</h2>
+                  <button class="icon-btn" id="modal-close-btn">${icon("x", 16)}</button>
+                </div>
+                <div class="modal-body">
+                  <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div>
+                      <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted);">サイト / アプリ名</div>
+                      <div style="font-size: 14px; font-weight: 600; margin-top: 2px;">${escapeHtml(e.title)}</div>
+                    </div>
+                    ${
+                      e.url
+                        ? `
+                      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
+                        <div>
+                          <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted);">URL</div>
+                          <div style="font-size: 13px; margin-top: 2px;">${escapeHtml(e.url)}</div>
+                        </div>
+                        <button class="btn btn-soft" data-action="copy" data-val="${escapeHtml(e.url)}" data-lbl="URL" style="padding: 4px 10px; font-size: 11px;">コピー</button>
+                      </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      e.email
+                        ? `
+                      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
+                        <div>
+                          <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted);">メールアドレス</div>
+                          <div style="font-size: 13px; font-family: monospace; margin-top: 2px;">${escapeHtml(e.email)}</div>
+                        </div>
+                        <button class="btn btn-soft" data-action="copy" data-val="${escapeHtml(e.email)}" data-lbl="メールアドレス" style="padding: 4px 10px; font-size: 11px;">コピー</button>
+                      </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      e.username
+                        ? `
+                      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
+                        <div>
+                          <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted);">ユーザー名</div>
+                          <div style="font-size: 13px; font-family: monospace; margin-top: 2px;">${escapeHtml(e.username)}</div>
+                        </div>
+                        <button class="btn btn-soft" data-action="copy" data-val="${escapeHtml(e.username)}" data-lbl="ユーザー名" style="padding: 4px 10px; font-size: 11px;">コピー</button>
+                      </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      e.password
+                        ? `
+                      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
+                        <div>
+                          <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted);">パスワード</div>
+                          <div id="detail-pw-text" style="font-size: 13px; font-family: monospace; margin-top: 2px; letter-spacing: 0.1em;">••••••••</div>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                          <button class="btn btn-soft" id="detail-pw-toggle" style="padding: 4px 10px; font-size: 11px;">表示</button>
+                          <button class="btn btn-soft" data-action="copy" data-val="${escapeHtml(e.password)}" data-lbl="パスワード" style="padding: 4px 10px; font-size: 11px;">コピー</button>
+                        </div>
+                      </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      e.totp && e.totp.trim()
+                        ? `
+                      <div style="border-top: 1px solid var(--border); padding-top: 10px;">
+                        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">2FA ワンタイムコード</div>
+                        <button class="btn btn-soft" data-action="copy-totp" data-id="${e.id}" style="font-size: 16px; font-weight: 800; color: var(--accent); letter-spacing: 0.2em; font-family: monospace;">
+                          ${icon("zap", 14)} ${totpCode}
+                        </button>
+                      </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      e.note
+                        ? `
+                      <div style="border-top: 1px solid var(--border); padding-top: 10px;">
+                        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted);">メモ</div>
+                        <p style="font-size: 13px; color: var(--text); line-height: 1.5; margin-top: 4px; white-space: pre-wrap;">${escapeHtml(e.note)}</p>
+                      </div>
+                    `
+                        : ""
+                    }
+                  </div>
+
+                  <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;">
+                    <button class="btn btn-danger" id="detail-delete-btn" style="padding: 6px 12px;">
+                      ${icon("trash", 13)} 削除
+                    </button>
+                    <button class="btn btn-primary" id="detail-edit-btn" style="padding: 6px 14px;">
+                      ${icon("pencil", 13)} 編集
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Edit / Create Modal
+        if (state.editingEntry) {
+          const e = state.editingEntry;
+          const isNew = !state.data.entries.some((x) => x.id === e.id);
+
+          out += `
+            <div class="modal-backdrop" id="modal-edit-backdrop">
+              <div class="modal-box wide anim-modal">
+                <div class="modal-header">
+                  <h2 style="font-size: 15px; font-weight: 800;">${isNew ? "新しい項目を追加" : "項目を編集"}</h2>
+                  <button class="icon-btn" id="modal-edit-close-btn">${icon("x", 16)}</button>
+                </div>
+                <div class="modal-body">
+                  <form id="edit-form" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div>
+                      <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">サイト / アプリ名 *</div>
+                      <input type="text" id="edit-title" class="input-text" value="${escapeHtml(e.title)}" placeholder="例: GitHub" required autofocus />
+                    </div>
+                    <div>
+                      <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">URL (任意)</div>
+                      <input type="text" id="edit-url" class="input-text" value="${escapeHtml(e.url)}" placeholder="https://" />
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                      <div>
+                        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">メールアドレス</div>
+                        <input type="email" id="edit-email" class="input-text" value="${escapeHtml(e.email)}" placeholder="you@example.com" />
+                      </div>
+                      <div>
+                        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">ユーザー名</div>
+                        <input type="text" id="edit-username" class="input-text" value="${escapeHtml(e.username)}" />
+                      </div>
+                    </div>
+                    <div>
+                      <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">パスワード</div>
+                      <div style="display: flex; gap: 6px;">
+                        <input type="password" id="edit-pw" class="input-text font-mono" value="${escapeHtml(e.password)}" />
+                        <button type="button" class="icon-btn" id="edit-pw-toggle" title="表示切替">${icon("eye", 15)}</button>
+                        <button type="button" class="icon-btn" id="edit-pw-gen" title="パスワード生成">${icon("refresh", 15)}</button>
+                      </div>
+                    </div>
+                    <div>
+                      <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">2FA シークレット (Base32 または otpauth://)</div>
+                      <input type="text" id="edit-totp" class="input-text font-mono" value="${escapeHtml(e.totp)}" placeholder="JBSWY3DPEHPK3PXP" />
+                    </div>
+                    <div>
+                      <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">メモ</div>
+                      <textarea id="edit-note" class="input-text" style="min-height: 80px; resize: vertical;">${escapeHtml(e.note)}</textarea>
+                    </div>
+
+                    <div style="margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px;">
+                      <button type="button" class="btn btn-ghost" id="edit-cancel-btn">キャンセル</button>
+                      <button type="submit" class="btn btn-primary">${icon("check", 14)} 保存</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // In-app Confirm Dialog
+        if (state.confirmDialog) {
+          const c = state.confirmDialog;
+          out += `
+            <div class="modal-backdrop" id="modal-confirm-backdrop" style="z-index: 200;">
+              <div class="modal-box anim-modal" style="max-width: 440px;">
+                <div class="modal-header">
+                  <h2 style="font-size: 15px; font-weight: 800;">${escapeHtml(c.title)}</h2>
+                  <button class="icon-btn" id="confirm-close-btn">${icon("x", 16)}</button>
+                </div>
+                <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+                  <div style="display: flex; gap: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg2); padding: 14px;">
+                    <div style="color: ${c.danger ? "var(--danger)" : "var(--accent)"}; flex-shrink: 0; margin-top: 2px;">
+                      ${icon(c.danger ? "alert" : "shieldCheck", 18)}
+                    </div>
+                    <p style="font-size: 13px; color: var(--text); line-height: 1.5;">${escapeHtml(c.message)}</p>
+                  </div>
+                  <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                    <button class="btn btn-ghost" id="confirm-cancel-btn">${escapeHtml(c.cancelLabel || "キャンセル")}</button>
+                    <button class="btn ${c.danger ? "btn-danger" : "btn-primary"}" id="confirm-ok-btn">
+                      ${icon(c.danger ? "trash" : "check", 14)} ${escapeHtml(c.confirmLabel || "確認")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        return out;
+      }
+
+      function bindMainEvents() {
+        // Navigation buttons
+        const btnList = document.getElementById("nav-btn-list");
+        const btnSettings = document.getElementById("nav-btn-settings");
+        const tabList = document.getElementById("tab-btn-list");
+        const tabSettings = document.getElementById("tab-btn-settings");
+
+        const goList = () => {
+          state.screen = "list";
+          window.scrollTo(0, 0);
+          render();
+        };
+        const goSettings = () => {
+          state.screen = "settings";
+          window.scrollTo(0, 0);
+          render();
+        };
+
+        if (btnList) btnList.onclick = goList;
+        if (btnSettings) btnSettings.onclick = goSettings;
+        if (tabList) tabList.onclick = goList;
+        if (tabSettings) tabSettings.onclick = goSettings;
+
+        // Search input
+        const searchInput = document.getElementById("search-input");
+        if (searchInput) {
+          searchInput.oninput = (e) => {
+            state.query = e.target.value;
+            render();
+            // keep focus at end of input
+            const fresh = document.getElementById("search-input");
+            if (fresh) {
+              fresh.focus();
+              fresh.setSelectionRange(fresh.value.length, fresh.value.length);
+            }
+          };
+        }
+
+        // Locks
+        const sbLock = document.getElementById("sidebar-lock-btn");
+        const mbLock = document.getElementById("mobile-lock-btn");
+        if (sbLock) sbLock.onclick = lock;
+        if (mbLock) mbLock.onclick = lock;
+
+        // FAB (+)
+        const fab = document.getElementById("fab-add-btn");
+        if (fab) {
+          fab.onclick = () => {
+            state.editingEntry = {
+              id: uid(),
+              title: "",
+              url: "",
+              email: "",
+              username: "",
+              password: "",
+              totp: "",
+              note: "",
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            };
+            render();
+          };
+        }
+
+        // Sort Dropdown
+        const sortBtn = document.getElementById("sort-dropdown-btn");
+        const sortBackdrop = document.getElementById("sort-backdrop");
+        const sortDirBtn = document.getElementById("sort-dir-btn");
+
+        if (sortBtn) {
+          sortBtn.onclick = () => {
+            state.sortOpen = !state.sortOpen;
+            render();
+          };
+        }
+        if (sortBackdrop) {
+          sortBackdrop.onclick = () => {
+            state.sortOpen = false;
+            render();
+          };
+        }
+        if (sortDirBtn) {
+          sortDirBtn.onclick = () => {
+            const nextDir = (state.data.settings.sortDir || "desc") === "asc" ? "desc" : "asc";
+            saveVault({ ...state.data, settings: { ...state.data.settings, sortDir: nextDir } });
+          };
+        }
+        document.querySelectorAll(".sort-opt-btn").forEach((btn) => {
+          btn.onclick = () => {
+            const m = btn.getAttribute("data-sort");
+            const defaultDirs = { updated: "desc", oldest: "asc", title: "asc" };
+            state.sortOpen = false;
+            saveVault({
+              ...state.data,
+              settings: { ...state.data.settings, sortOrder: m, sortDir: defaultDirs[m] }
+            });
+          };
+        });
+
+        // Entry clicks & copies (delegation)
+        appEl.onclick = async (e) => {
+          const btn = e.target.closest("button");
+          if (!btn) return;
+          const action = btn.getAttribute("data-action");
+          if (!action) return;
+
+          e.stopPropagation();
+
+          if (action === "copy") {
+            const val = btn.getAttribute("data-val");
+            const lbl = btn.getAttribute("data-lbl");
+            await copyText(val, lbl);
+          } else if (action === "copy-totp") {
+            const id = btn.getAttribute("data-id");
+            const entry = state.data.entries.find((x) => x.id === id);
+            if (entry) {
+              const code = await computeTotp(entry.totp);
+              await copyText(code, "2FAコード");
+            }
+          } else if (action === "view") {
+            const id = btn.getAttribute("data-id");
+            state.selectedEntry = state.data.entries.find((x) => x.id === id);
+            render();
+          } else if (action === "favorite") {
+            const id = btn.getAttribute("data-id");
+            saveVault({
+              ...state.data,
+              entries: state.data.entries.map((x) => (x.id === id ? { ...x, favorite: !x.favorite } : x))
+            });
+          } else if (action === "edit") {
+            const id = btn.getAttribute("data-id");
+            state.editingEntry = { ...state.data.entries.find((x) => x.id === id) };
+            state.selectedEntry = null;
+            render();
+          } else if (action === "delete") {
+            const id = btn.getAttribute("data-id");
+            const target = state.data.entries.find((x) => x.id === id);
+            if (!target) return;
+            confirmAction({
+              title: "項目を削除する",
+              message: `「${target.title}」を削除しますか?この操作は取り消せません。`,
+              confirmLabel: "削除する",
+              danger: true,
+              onConfirm: () => {
+                saveVault({
+                  ...state.data,
+                  entries: state.data.entries.filter((x) => x.id !== id)
+                });
+                showToast("削除しました");
+              }
+            });
+          }
+        };
+
+        // Detail Modal Events
+        const detailClose = document.getElementById("modal-close-btn");
+        const detailBackdrop = document.getElementById("modal-detail-backdrop");
+        if (detailClose) detailClose.onclick = () => { state.selectedEntry = null; render(); };
+        if (detailBackdrop) {
+          detailBackdrop.onclick = (e) => {
+            if (e.target === detailBackdrop) { state.selectedEntry = null; render(); }
+          };
+        }
+        const detailPwToggle = document.getElementById("detail-pw-toggle");
+        if (detailPwToggle && state.selectedEntry) {
+          let revealed = false;
+          detailPwToggle.onclick = () => {
+            revealed = !revealed;
+            const el = document.getElementById("detail-pw-text");
+            if (el) el.textContent = revealed ? state.selectedEntry.password : "••••••••";
+            detailPwToggle.textContent = revealed ? "隠す" : "表示";
+          };
+        }
+        const detailEditBtn = document.getElementById("detail-edit-btn");
+        if (detailEditBtn && state.selectedEntry) {
+          detailEditBtn.onclick = () => {
+            state.editingEntry = { ...state.selectedEntry };
+            state.selectedEntry = null;
+            render();
+          };
+        }
+        const detailDeleteBtn = document.getElementById("detail-delete-btn");
+        if (detailDeleteBtn && state.selectedEntry) {
+          detailDeleteBtn.onclick = () => {
+            const target = state.selectedEntry;
+            confirmAction({
+              title: "項目を削除する",
+              message: `「${target.title}」を削除しますか?この操作は取り消せません。`,
+              confirmLabel: "削除する",
+              danger: true,
+              onConfirm: () => {
+                saveVault({
+                  ...state.data,
+                  entries: state.data.entries.filter((x) => x.id !== target.id)
+                });
+                state.selectedEntry = null;
+                showToast("削除しました");
+              }
+            });
+          };
+        }
+
+        // Edit Modal Events
+        const editClose = document.getElementById("modal-edit-close-btn");
+        const editCancel = document.getElementById("edit-cancel-btn");
+        const editBackdrop = document.getElementById("modal-edit-backdrop");
+        const closeEdit = () => { state.editingEntry = null; render(); };
+        if (editClose) editClose.onclick = closeEdit;
+        if (editCancel) editCancel.onclick = closeEdit;
+        if (editBackdrop) {
+          editBackdrop.onclick = (e) => { if (e.target === editBackdrop) closeEdit(); };
+        }
+        const editPwToggle = document.getElementById("edit-pw-toggle");
+        const editPw = document.getElementById("edit-pw");
+        if (editPwToggle && editPw) {
+          editPwToggle.onclick = () => {
+            const isPw = editPw.type === "password";
+            editPw.type = isPw ? "text" : "password";
+            editPwToggle.innerHTML = icon(isPw ? "eyeOff" : "eye", 15);
+          };
+        }
+        const editPwGen = document.getElementById("edit-pw-gen");
+        if (editPwGen && editPw) {
+          editPwGen.onclick = () => {
+            editPw.value = generatePassword(20);
+          };
+        }
+        const editForm = document.getElementById("edit-form");
+        if (editForm) {
+          editForm.onsubmit = (e) => {
+            e.preventDefault();
+            const id = state.editingEntry.id;
+            const isNew = !state.data.entries.some((x) => x.id === id);
+            const entry = {
+              id,
+              title: document.getElementById("edit-title").value.trim(),
+              url: document.getElementById("edit-url").value.trim(),
+              email: document.getElementById("edit-email").value.trim(),
+              username: document.getElementById("edit-username").value.trim(),
+              password: document.getElementById("edit-pw").value,
+              totp: document.getElementById("edit-totp").value.trim(),
+              note: document.getElementById("edit-note").value,
+              favorite: state.editingEntry.favorite || false,
+              createdAt: state.editingEntry.createdAt || Date.now(),
+              updatedAt: Date.now()
+            };
+            const nextEntries = isNew
+              ? [entry, ...state.data.entries]
+              : state.data.entries.map((x) => (x.id === id ? entry : x));
+            state.editingEntry = null;
+            saveVault({ ...state.data, entries: nextEntries });
+            showToast(isNew ? "追加しました" : "保存しました");
+          };
+        }
+
+        // Confirm Dialog Events
+        const confirmClose = document.getElementById("confirm-close-btn");
+        const confirmCancel = document.getElementById("confirm-cancel-btn");
+        const confirmBackdrop = document.getElementById("modal-confirm-backdrop");
+        const confirmOk = document.getElementById("confirm-ok-btn");
+        const closeConfirm = () => { state.confirmDialog = null; render(); };
+
+        if (confirmClose) confirmClose.onclick = closeConfirm;
+        if (confirmCancel) confirmCancel.onclick = closeConfirm;
+        if (confirmBackdrop) {
+          confirmBackdrop.onclick = (e) => { if (e.target === confirmBackdrop) closeConfirm(); };
+        }
+        if (confirmOk && state.confirmDialog) {
+          confirmOk.onclick = async () => {
+            const fn = state.confirmDialog.onConfirm;
+            state.confirmDialog = null;
+            render();
+            if (fn) await fn();
+          };
+        }
+
+        // Settings page events
+        if (state.screen === "settings") {
+          const reqPwCheck = document.getElementById("setting-require-pw");
+          if (reqPwCheck) {
+            reqPwCheck.onchange = () => {
+              if (!reqPwCheck.checked) {
+                confirmAction({
+                  title: "パスワード要求をオフにする",
+                  message: "パスワード要求をオフにすると、端末内のデバイス鍵で自動復号されます。安全性が低下しますが設定を変更しますか?",
+                  confirmLabel: "オフにする",
+                  danger: true,
+                  onConfirm: async () => {
+                    await rekeyVault(null);
+                    showToast("パスワード要求をオフにしました");
+                  }
+                });
+                reqPwCheck.checked = true; // revert until confirmed
+              } else {
+                showToast("下のフォームから新しいパスワードを設定してください");
+                reqPwCheck.checked = false;
+              }
+            };
+          }
+
+          const updatePwBtn = document.getElementById("setting-update-pw-btn");
+          if (updatePwBtn) {
+            updatePwBtn.onclick = async () => {
+              const p1 = document.getElementById("setting-new-pw1").value;
+              const p2 = document.getElementById("setting-new-pw2").value;
+              if (p1.length < 4 || p1 !== p2) {
+                showToast("パスワードが一致しないか4文字未満です");
+                return;
+              }
+              updatePwBtn.disabled = true;
+              updatePwBtn.innerHTML = `${icon("refresh", 14)} 再暗号化中…`;
+              await rekeyVault(p1);
+              showToast("マスターパスワードを更新しました");
+            };
+          }
+
+          const lockBlur = document.getElementById("setting-lock-blur");
+          if (lockBlur) {
+            lockBlur.onchange = () => {
+              saveVault({ ...state.data, settings: { ...state.data.settings, lockOnBlur: lockBlur.checked } });
+            };
+          }
+
+          const autoLockInput = document.getElementById("setting-autolock");
+          if (autoLockInput) {
+            autoLockInput.onchange = () => {
+              saveVault({ ...state.data, settings: { ...state.data.settings, autoLockMinutes: Number(autoLockInput.value) || 0 } });
+            };
+          }
+
+          const clipClearInput = document.getElementById("setting-clipclear");
+          if (clipClearInput) {
+            clipClearInput.onchange = () => {
+              saveVault({ ...state.data, settings: { ...state.data.settings, clipboardClearSeconds: Number(clipClearInput.value) || 0 } });
+            };
+          }
+
+          const themeDark = document.getElementById("theme-dark-btn");
+          const themeLight = document.getElementById("theme-light-btn");
+          if (themeDark) {
+            themeDark.onclick = () => saveVault({ ...state.data, settings: { ...state.data.settings, theme: "dark" } });
+          }
+          if (themeLight) {
+            themeLight.onclick = () => saveVault({ ...state.data, settings: { ...state.data.settings, theme: "light" } });
+          }
+
+          const syncEnabled = document.getElementById("setting-sync-enabled");
+          if (syncEnabled) {
+            syncEnabled.onchange = () => {
+              saveVault({ ...state.data, settings: { ...state.data.settings, serverSyncEnabled: syncEnabled.checked } });
+            };
+          }
+
+          const serverUrl = document.getElementById("setting-server-url");
+          if (serverUrl) {
+            serverUrl.onchange = () => {
+              saveVault({ ...state.data, settings: { ...state.data.settings, serverUrl: serverUrl.value } });
+            };
+          }
+
+          const serverToken = document.getElementById("setting-server-token");
+          if (serverToken) {
+            serverToken.onchange = () => {
+              saveVault({ ...state.data, settings: { ...state.data.settings, serverToken: serverToken.value } });
+            };
+          }
+
+          const uploadBtn = document.getElementById("sync-upload-btn");
+          if (uploadBtn) {
+            uploadBtn.onclick = async () => {
+              try {
+                const raw = loadRaw();
+                const res = await fetch(state.data.settings.serverUrl.replace(/\/$/, "") + "/vault", {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(state.data.settings.serverToken ? { Authorization: `Bearer ${state.data.settings.serverToken}` } : {})
+                  },
+                  body: JSON.stringify({ salt: raw.salt, iterations: raw.iterations, payload: raw.payload })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                showToast("サーバへアップロードしました");
+              } catch (err) {
+                showToast("アップロード失敗: " + err.message);
+              }
+            };
+          }
+
+          const downloadBtn = document.getElementById("sync-download-btn");
+          if (downloadBtn) {
+            downloadBtn.onclick = async () => {
+              try {
+                const res = await fetch(state.data.settings.serverUrl.replace(/\/$/, "") + "/vault", {
+                  headers: state.data.settings.serverToken ? { Authorization: `Bearer ${state.data.settings.serverToken}` } : {}
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const body = await res.json();
+                const raw = loadRaw();
+                saveRaw({ ...raw, salt: body.salt, iterations: body.iterations, payload: body.payload });
+                showToast("ダウンロード完了。再ロック後に反映されます");
+              } catch (err) {
+                showToast("ダウンロード失敗: " + err.message);
+              }
+            };
+          }
+
+          const exportBtn = document.getElementById("export-backup-btn");
+          if (exportBtn) {
+            exportBtn.onclick = () => {
+              const raw = loadRaw();
+              const blob = new Blob([JSON.stringify(raw, null, 2)], { type: "application/json" });
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = `cryptopass-backup-${new Date().toISOString().slice(0, 10)}.json`;
+              a.click();
+              showToast("暗号化バックアップを書き出しました");
+            };
+          }
+
+          const importInput = document.getElementById("import-backup-file");
+          if (importInput) {
+            importInput.onchange = async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                const parsed = JSON.parse(await file.text());
+                if (!parsed?.payload?.ct) throw new Error("形式が不正です");
+                saveRaw(parsed);
+                showToast("読み込みました。ロック解除し直してください");
+                lock();
+              } catch (err) {
+                showToast("読み込み失敗: " + err.message);
+              }
+            };
+          }
+
+          const deleteInput = document.getElementById("delete-confirm-input");
+          const deleteAllBtn = document.getElementById("delete-all-btn");
+          if (deleteInput && deleteAllBtn) {
+            deleteInput.oninput = () => {
+              deleteAllBtn.disabled = deleteInput.value !== "DELETE";
+            };
+            deleteAllBtn.onclick = () => {
+              confirmAction({
+                title: "アカウントのデータを削除する",
+                message: "この端末に保存された暗号化データと設定をすべて完全に削除します。バックアップがない場合は復元できません。この操作は取り消せません。",
+                confirmLabel: "すべて削除する",
+                danger: true,
+                onConfirm: () => {
+                  wipeVault();
+                  state.hasVault = false;
+                  lock();
+                }
+              });
+            };
+          }
+        }
+      }
+
+      const style = document.createElement("style");
+      style.textContent = `
+        @media (min-width: 768px) {
+          .md-hidden { display: none !important; }
+          .md-block { display: block !important; }
+        }
+        @media (max-width: 480px) {
+          .hidden-xs { display: none !important; }
+        }
+      `;
+      document.head.appendChild(style);
+      render();
+    </script>
+  </body>
+</html>
