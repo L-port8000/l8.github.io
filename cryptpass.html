@@ -91,6 +91,7 @@
         border-radius: 99px;
       }
 
+      /* Ambient background */
       .ambient-grid {
         position: fixed;
         inset: 0;
@@ -149,6 +150,7 @@
         animation: toastIn 0.25s cubic-bezier(0.22, 0.68, 0.31, 1) both;
       }
 
+      /* Search highlight mark */
       mark.hl {
         background: rgba(0, 247, 130, 0.24);
         color: var(--accent);
@@ -157,6 +159,7 @@
         border-radius: 3px;
       }
 
+      /* Common primitives */
       .panel {
         background: var(--panel);
         border: 1px solid var(--border);
@@ -254,6 +257,7 @@
         cursor: not-allowed;
       }
 
+      /* Unified Copy Box */
       .copy-val-box {
         display: flex;
         align-items: center;
@@ -317,6 +321,7 @@
         transition: color 0.15s;
       }
 
+      /* Layout */
       #app {
         position: relative;
         z-index: 10;
@@ -356,6 +361,8 @@
         flex-direction: column;
       }
       .header-bar {
+        padding-top: 12px;
+        padding-bottom: 10px;
         position: sticky;
         top: 0;
         z-index: 30;
@@ -386,6 +393,7 @@
         }
       }
 
+      /* FAB Session Style */
       .fab-btn {
         position: fixed;
         left: 50%;
@@ -431,6 +439,7 @@
         }
       }
 
+      /* Mobile Nav Bar */
       .mobile-nav {
         position: fixed;
         bottom: 0;
@@ -464,6 +473,7 @@
         color: var(--accent);
       }
 
+      /* Modal */
       .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -514,6 +524,7 @@
         overflow-y: auto;
       }
 
+      /* Toast */
       .toast-box {
         position: fixed;
         bottom: 24px;
@@ -533,6 +544,7 @@
         max-width: calc(100vw - 32px);
       }
 
+      /* Entry list item */
       .entry-row {
         position: relative;
         overflow: hidden;
@@ -637,6 +649,13 @@
     <div id="app"></div>
 
     <script>
+      /* =========================================================
+       * CryptPass — 完全ローカル暗号化パスワードマネージャ
+       * WebCrypto (PBKDF2-SHA256 310k + AES-GCM-256)
+       * RFC 6238 TOTP (2FA)
+       * Session-style Dark / Light UI, Standalone Single HTML
+       * ========================================================= */
+
       const enc = new TextEncoder();
       const dec = new TextDecoder();
 
@@ -694,6 +713,7 @@
         return out;
       }
 
+      /* RFC 6238 TOTP */
       function base32Decode(input) {
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
         const clean = (input || "").replace(/=+$/, "").replace(/\s/g, "").toUpperCase();
@@ -753,6 +773,7 @@
 
       const totpRemaining = (period = 30) => period - (Math.floor(Date.now() / 1000) % period);
 
+      /* SVG Icons */
       const ICONS = {
         logo: '<path d="M12 2.2 20 5.1v6.2c0 5.2-3.4 8.9-8 10.5-4.6-1.6-8-5.3-8-10.5V5.1Z"/><circle cx="12" cy="10.2" r="2.3"/><path d="M12 12.5v3.6"/>',
         search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
@@ -811,7 +832,8 @@
         return `${before}<mark class="hl">${match}</mark>${after}`;
       }
 
-      const STORAGE_KEY = "cryptoPass.v1";
+      /* Storage */
+      const STORAGE_KEY = "cryptovault.v1";
       const loadRaw = () => {
         try {
           const s = localStorage.getItem(STORAGE_KEY);
@@ -840,6 +862,7 @@
 
       const uid = () => b64(randomBytes(12)).replace(/[^a-zA-Z0-9]/g, "").slice(0, 12);
 
+      /* Application State */
       let state = {
         hasVault: existsVault(),
         cryptoKey: null,
@@ -972,6 +995,7 @@
         render();
       }
 
+      /* Auto lock on blur & idle */
       document.addEventListener("visibilitychange", () => {
         if (document.hidden && state.data?.settings?.lockOnBlur) {
           lock();
@@ -989,6 +1013,7 @@
         window.addEventListener(e, resetIdleTimer)
       );
 
+      /* Global TOTP ticker */
       setInterval(async () => {
         if (!state.data) return;
         let changed = false;
@@ -1014,11 +1039,14 @@
           });
         }
       }, 1000);
+
+      /* In-app confirmation dialog */
       function confirmAction(options) {
         state.confirmDialog = options;
         render();
       }
 
+      /* ================= Rendering ================= */
       const appEl = document.getElementById("app");
 
       function render() {
@@ -1042,7 +1070,7 @@
                   ${icon("logo", 34, 1.8)}
                 </div>
                 <div style="margin-top: 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.24em; color: var(--accent);">End-to-End Encrypted</div>
-                <h1 style="font-size: 22px; font-weight: 800; margin-top: 4px;">CryptoPass</h1>
+                <h1 style="font-size: 22px; font-weight: 800; margin-top: 4px;">CryptPass</h1>
                 <p style="font-size: 13px; color: var(--muted); margin-top: 4px;">新しい保管庫を作成します</p>
               </div>
 
@@ -1123,7 +1151,7 @@
                   ${icon("logo", 34, 1.8)}
                 </div>
                 <div style="margin-top: 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.24em; color: var(--accent);">End-to-End Encrypted</div>
-                <h1 style="font-size: 22px; font-weight: 800; margin-top: 4px;">CryptoPass</h1>
+                <h1 style="font-size: 22px; font-weight: 800; margin-top: 4px;">CryptPass</h1>
                 <p style="font-size: 13px; color: var(--muted); margin-top: 4px;">マスターパスワードでロックを解除</p>
               </div>
 
@@ -1230,7 +1258,7 @@
                   ${icon("logo", 20, 1.8)}
                 </div>
                 <div>
-                  <div style="font-size: 16px; font-weight: 800; line-height: 1;">CryptoPass</div>
+                  <div style="font-size: 16px; font-weight: 800; line-height: 1;">CryptPass</div>
                   <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.22em; color: var(--accent); margin-top: 4px;">E2E Encrypted</div>
                 </div>
               </div>
@@ -1505,7 +1533,7 @@
 
       function renderSettingsContent() {
         const s = state.data.settings;
-        const SERVER_REPO = "https://github.com/cryptopass-selfhost/cryptopass-server";
+        const SERVER_REPO = "https://github.com/cryptovault-selfhost/cryptovault-server";
 
         return `
           <div class="anim-fade-up" style="max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;">
@@ -2296,7 +2324,7 @@
               const blob = new Blob([JSON.stringify(raw, null, 2)], { type: "application/json" });
               const a = document.createElement("a");
               a.href = URL.createObjectURL(blob);
-              a.download = `cryptopass-backup-${new Date().toISOString().slice(0, 10)}.json`;
+              a.download = `cryptovault-backup-${new Date().toISOString().slice(0, 10)}.json`;
               a.click();
               showToast("暗号化バックアップを書き出しました");
             };
@@ -2342,6 +2370,7 @@
         }
       }
 
+      /* Helper responsive style rule additions */
       const style = document.createElement("style");
       style.textContent = `
         @media (min-width: 768px) {
@@ -2353,6 +2382,8 @@
         }
       `;
       document.head.appendChild(style);
+
+      /* Kick off app */
       render();
     </script>
   </body>
