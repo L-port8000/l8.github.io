@@ -1,12 +1,13 @@
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>o</title>
-    <link rel="icon" href="https://l8.f5.si/algebla.png">
+    <title>o - I Browser</title>
+    <link rel="icon" href="./algebla.png">
     <link rel="apple-touch-icon" href="https://l8.f5.si/algebla.png">
     <meta name="apple-mobile-web-app-title" content="IBrowser">
     <style>
@@ -18,10 +19,11 @@
             --accent: #0060df;
             --tor-color: #7d4698;
             --tab-card-bg: #ffffff;
+            --app-height: 100vh;
             --safe-area-bottom: env(safe-area-inset-bottom, 0px);
             --safe-area-top: env(safe-area-inset-top, 0px);
         }
-        body.dark-mode {
+        body.dark-mode, html.dark-mode {
             --bg-color: #1c1b22;
             --toolbar-bg: #2b2a33;
             --text-color: #fbfbfe;
@@ -31,6 +33,7 @@
             --tab-card-bg: #42414d;
         }
         * { box-sizing: border-box; }
+        html { background: var(--bg-color); }
         body {
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -38,7 +41,7 @@
             color: var(--text-color);
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: var(--app-height, 100vh);
             overflow: hidden;
         }
 
@@ -47,9 +50,22 @@
         #progress-bar { width: 0%; height: 100%; background: var(--accent); transition: width 0.3s ease; }
 
         /* ---- メインコンテナ ---- */
-        #main-container { flex: 1; position: relative; overflow: hidden; }
+        #main-container { flex: 1; min-height: 0; position: relative; overflow: hidden; }
         .page-element { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; display: none; background: white; }
         .page-element.active { display: block; }
+
+        /* ---- iframe ラッパー / ズーム ---- */
+        .frame-wrap { overflow: hidden; -webkit-overflow-scrolling: touch; }
+        .frame-el {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            border: none; background: #fff;
+            transform-origin: 0 0;
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .frame-spacer { pointer-events: none; }
 
         /* ---- ブックマークバー ---- */
         #bookmark-bar {
@@ -94,7 +110,7 @@
         }
         #url {
             flex: 1; border: none; background: transparent;
-            color: var(--text-color); font-size: 15px; outline: none; width: 100%;
+            color: var(--text-color); font-size: 16px; outline: none; width: 100%;
         }
         .icon-btn {
             background: transparent; border: none; color: var(--text-color);
@@ -167,6 +183,36 @@
         .menu-item:active { background: rgba(128,128,128,0.1); }
         .star-active { color: #f1c40f; }
 
+        /* ---- ズームパネル ---- */
+        #zoom-panel {
+            position: fixed;
+            bottom: calc(70px + var(--safe-area-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--toolbar-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            display: none;
+            align-items: center;
+            gap: 2px;
+            padding: 6px 8px;
+            z-index: 210;
+            white-space: nowrap;
+        }
+        #zoom-panel.show { display: flex; }
+        .zoom-btn {
+            background: transparent; border: none; color: var(--text-color);
+            font-size: 18px; padding: 6px 12px; border-radius: 16px; cursor: pointer;
+        }
+        .zoom-btn:active { background: rgba(128,128,128,0.18); }
+        .zoom-value {
+            background: transparent; border: none; color: var(--text-color);
+            font-size: 15px; font-weight: 700; min-width: 64px; padding: 6px 2px; cursor: pointer;
+        }
+        #zoom-fit-btn.off { opacity: 0.3; }
+        .toolbar-top #zoom-panel { bottom: auto; top: calc(70px + var(--safe-area-top)); }
+
         /* ---- タブスイッチャー ---- */
         #tab-switcher {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -230,7 +276,7 @@
         .nt-search-row input {
             flex: 1; padding: 11px 20px; border-radius: 24px;
             border: 1px solid var(--border-color); background: var(--toolbar-bg);
-            color: var(--text-color); font-size: 14px; outline: none;
+            color: var(--text-color); font-size: 16px; outline: none;
         }
         .nt-search-row input:focus { border-color: var(--accent); }
         .nt-search-row button {
@@ -260,11 +306,17 @@
         .proxy-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
         .proxy-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
         .status-connected { color: #28a745; font-weight: bold; font-size: 12px; margin-right: 8px; }
-        select, input[type="text"] { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); font-size: 14px; margin-bottom: 8px; }
+        select, input[type="text"] { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); font-size: 16px; margin-bottom: 8px; }
+        input[type="range"] { accent-color: var(--accent); }
         button.btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(128,128,128,0.1); color: inherit; font-size: 14px; cursor: pointer; }
         button.btn-primary { background: var(--accent); color: white; border: none; width: 100%; padding: 12px; font-weight: bold; border-radius: 8px; margin-top: 10px; cursor: pointer; }
         button.btn-danger { border-color: #c00; color: #c00; }
         .preset-group { display: flex; flex-wrap: wrap; gap: 8px; }
+        .range-row { display: flex; align-items: center; gap: 10px; }
+        .range-row input[type="range"] { flex: 1; margin: 0; }
+        .range-bound { font-size: 12px; opacity: 0.6; }
+        .range-value { text-align: center; font-size: 22px; font-weight: 600; margin: 8px 0 10px; }
+        .hint { font-size: 12px; opacity: 0.55; margin: 8px 0 0; line-height: 1.5; }
 
         /* ---- モーダル ---- */
         .modal-overlay {
@@ -336,6 +388,21 @@
     </div>
 </div>
 
+<!-- JSON 表示・貼り付けモーダル -->
+<div id="json-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width:560px;">
+        <h3 id="json-modal-title">JSON</h3>
+        <textarea id="json-modal-text" spellcheck="false" style="width:100%;height:210px;font-family:monospace;font-size:16px;line-height:1.4;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);padding:8px;resize:vertical;"></textarea>
+        <div class="modal-btns" style="justify-content:space-between;flex-wrap:wrap;gap:6px;">
+            <button class="btn" onclick="copyJSONModal()">📋 コピー</button>
+            <div style="display:flex;gap:6px;">
+                <button class="btn" onclick="importFromModal()">📥 インポート</button>
+                <button class="btn modal-ok" onclick="closeJSONModal()">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- タブスイッチャー -->
 <div id="tab-switcher">
     <div id="tab-switcher-header">
@@ -365,6 +432,9 @@
     <div class="menu-item" onclick="toggleBookmark(); toggleMenu();">
         <span id="menu-star" style="width:24px;text-align:center;font-size:20px;">★</span> ブックマーク
     </div>
+    <div class="menu-item" onclick="toggleZoomPanel(); toggleMenu();">
+        <span style="width:24px;text-align:center;">🔍</span> ズーム
+    </div>
     <div class="menu-item" onclick="toggleFullscreen(); toggleMenu();">
         <span style="width:24px;text-align:center;">⛶</span> フルスクリーン
     </div>
@@ -377,6 +447,15 @@
     <div class="menu-item" onclick="toggleDarkMode(); toggleMenu();">
         <span style="width:24px;text-align:center;">🌓</span> ダークモード
     </div>
+</div>
+
+<!-- ズームパネル -->
+<div id="zoom-panel">
+    <button class="zoom-btn" onclick="zoomStep(-10)">−</button>
+    <button class="zoom-value" onclick="setZoom(100)"><span id="zoom-value">100%</span></button>
+    <button class="zoom-btn" onclick="zoomStep(10)">＋</button>
+    <button class="zoom-btn" id="zoom-fit-btn" onclick="toggleZoomFit()" title="横幅に合わせる（自動フィット）">⇔</button>
+    <button class="zoom-btn" onclick="toggleZoomPanel()" title="閉じる">✕</button>
 </div>
 
 <!-- ブックマークバー -->
@@ -545,7 +624,7 @@ async function takeViewportScreenshot() {
 async function takeFullScreenshot() {
     closeScreenshotModal();
     const tab = tabs.find(t => t.id === activeTabId);
-    if (!tab || !tab.element || tab.element.tagName !== 'IFRAME') {
+    if (!tab || !tab.frame) {
         alert('iframeサイトが開かれていません。現在表示中の画面でキャプチャします。');
         takeViewportScreenshot();
         return;
@@ -553,7 +632,7 @@ async function takeFullScreenshot() {
 
     // Method 1: Canvas drawImage (works for same-origin iframes)
     try {
-        const iframe = tab.element;
+        const iframe = tab.frame;
         const doc = iframe.contentDocument || iframe.contentWindow.document;
         const body = doc.body;
         const html = doc.documentElement;
@@ -678,7 +757,8 @@ let profiles = loadProfiles();
 let activeProfileId = getActiveProfileId();
 if (!profiles.find(p => p.id === activeProfileId)) { activeProfileId = profiles[0].id; setActiveProfileId(activeProfileId); }
 
-function pk(key) { return `mobile-p${activeProfileId}-${key}`; }
+function pkFor(id, key) { return `mobile-p${id}-${key}`; }
+function pk(key) { return pkFor(activeProfileId, key); }
 
 const DEFAULT_SETTINGS = () => ({
     homeUrl: "newtab://",
@@ -692,17 +772,41 @@ const DEFAULT_SETTINGS = () => ({
     blockPopups: true,
     adBlock: true,
     toolbarPos: 'bottom',
-    history: []
+    history: [],
+    /* ---- ズーム / 表示 ---- */
+    zoom: 100,        // 拡大率 1〜500 (%)
+    zoomFit: true,    // サイトの横幅を画面に合わせる
+    pinchZoom: true,  // 二本指ズームを使う
+    heightOffset: 0,  // アプリ全体の高さの増減 (px, ±0 = 画面ぴったり) PWA調整用
+    contentOffsetY: 0 // iframe(コンテンツ)の上下位置 (px) PWA・ノッチ対策
 });
 
 let settings = DEFAULT_SETTINGS();
 
 function loadSettings() {
     const saved = localStorage.getItem(pk('settings'));
-    settings = saved ? { ...DEFAULT_SETTINGS(), ...JSON.parse(saved) } : DEFAULT_SETTINGS();
+    let raw = null;
+    try { raw = saved ? JSON.parse(saved) : null; } catch(e) { raw = null; }
+    settings = { ...DEFAULT_SETTINGS(), ...(raw || {}) };
+    // 旧バージョンの「アプリの高さ(%)」から px オフセットへ移行
+    if (raw && raw.heightOffset === undefined && raw.appHeight !== undefined) {
+        const legacy = Number(raw.appHeight);
+        settings.heightOffset = (isFinite(legacy) && legacy !== 100)
+            ? Math.round((legacy - 100) / 100 * (window.innerHeight || 800))
+            : 0;
+    }
+    settings.heightOffset = clampOffset(settings.heightOffset);
+    delete settings.appHeight;
+}
+
+let saveTimer = null;
+function saveSoon() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveState, 350);
 }
 
 function saveState() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     localStorage.setItem(pk('settings'), JSON.stringify(settings));
     localStorage.setItem(pk('sessions'), JSON.stringify(
         tabs.map(t => ({ id: t.id, url: t.url, title: t.title, history: t.history, historyIndex: t.historyIndex }))
@@ -782,9 +886,238 @@ function getEffectiveUrl(url) {
     return !settings.activeProxyId ? target : PROXIES[settings.activeProxyId].url + target;
 }
 
+/* ======================================================
+   ズーム（1% 〜 500%） / 画面の高さ
+====================================================== */
+function getActiveTab() { return tabs.find(t => t.id === activeTabId); }
+
+function clampZoom(v) {
+    v = Number(v);
+    if (!isFinite(v) || v <= 0) v = 100;
+    return Math.max(1, Math.min(500, Math.round(v)));
+}
+
+let zoomRaf = null;
+function scheduleZoom() {
+    if (zoomRaf) return;
+    zoomRaf = requestAnimationFrame(() => { zoomRaf = null; applyZoom(); });
+}
+
+/**
+ * iframe の表示倍率を適用する。
+ *  zoomFit = true : iframe のレイアウト幅を「画面幅 / 倍率」にするので、
+ *                   拡大しても横幅はちょうど画面に収まり、中のサイトも再レイアウトされる。
+ *  zoomFit = false: 画面幅を固定したまま拡大し、はみ出した分をスクロールできる（拡大鏡モード）。
+ */
+function applyZoom(tab) {
+    // 表示中のタブだけでなく全タブを同じ倍率に揃えるため、常に見えている
+    // メインコンテナのサイズを基準にする（非表示タブでも正しく計算できる）。
+    const mc = document.getElementById('main-container');
+    if (!mc) return;
+    const rect = mc.getBoundingClientRect();
+    const vw = Math.round(rect.width);
+    const vh = Math.round(rect.height);
+    if (vw < 1 || vh < 1) return;
+
+    const targets = tab ? [tab] : tabs.slice();
+    targets.forEach(t => applyZoomTo(t, vw, vh));
+}
+
+function applyZoomTo(tab, vw, vh) {
+    if (!tab || !tab.frame || !tab.element) return;
+    const wrap = tab.element;
+    const frame = tab.frame;
+    const z = clampZoom(settings.zoom) / 100;
+    const offY = clampOffset(settings.contentOffsetY);
+    let availH = vh - offY;
+    if (availH < 40) availH = 40;
+
+    frame.style.transformOrigin = '0 0';
+    frame.style.transform = 'scale(' + z + ')';
+    frame.style.position = 'absolute';
+    frame.style.left = '0';
+    frame.style.top = offY + 'px';
+
+    if (settings.zoomFit) {
+        if (wrap._spacer) wrap._spacer.style.display = 'none';
+        // 1%など極端な縮小時にiframeが巨大化しすぎないよう上限を設ける
+        let layoutW = vw / z;
+        let layoutH = availH / z;
+        if (layoutW > 3200) layoutW = 3200;
+        if (layoutH > 4000) layoutH = 4000;
+        frame.style.width  = layoutW + 'px';
+        frame.style.height = layoutH + 'px';
+        wrap.style.overflow = 'hidden';
+    } else {
+        frame.style.width  = vw + 'px';
+        frame.style.height = availH + 'px';
+        let sp = wrap._spacer;
+        if (!sp) {
+            sp = document.createElement('div');
+            sp.className = 'frame-spacer';
+            wrap.appendChild(sp);
+            wrap._spacer = sp;
+        }
+        sp.style.display = 'block';
+        sp.style.marginTop = Math.max(0, offY) + 'px';
+        sp.style.width  = Math.round(vw * z) + 'px';
+        sp.style.height = Math.round(availH * z) + 'px';
+        wrap.style.overflow = 'auto';
+    }
+}
+
+function setZoom(v) {
+    settings.zoom = clampZoom(v);
+    scheduleZoom();
+    updateZoomUI();
+    saveSoon();
+}
+
+function zoomStep(delta) { setZoom(clampZoom(settings.zoom) + delta); }
+
+function toggleZoomFit() {
+    settings.zoomFit = !settings.zoomFit;
+    applyZoom();
+    updateZoomUI();
+    saveState();
+}
+
+function toggleZoomPanel() {
+    const p = document.getElementById('zoom-panel');
+    p.classList.toggle('show');
+    updateZoomUI();
+}
+
+function updateZoomUI() {
+    const z = clampZoom(settings.zoom);
+    const zv = document.getElementById('zoom-value');
+    if (zv) zv.textContent = z + '%';
+    const rng = document.getElementById('set-zoom');
+    if (rng && String(rng.value) !== String(z)) rng.value = z;
+    const lbl = document.getElementById('set-zoom-label');
+    if (lbl) lbl.textContent = z + '%';
+    const fit = document.getElementById('zoom-fit-btn');
+    if (fit) fit.classList.toggle('off', !settings.zoomFit);
+}
+
+/* ---- 画面の高さ（±0 基準の px オフセット） ---- */
+const OFFSET_MIN = -400;
+const OFFSET_MAX = 400;
+
+function clampOffset(v) {
+    v = Number(v);
+    if (!isFinite(v)) v = 0;
+    return Math.max(OFFSET_MIN, Math.min(OFFSET_MAX, Math.round(v)));
+}
+
+function fmtOffset(v) {
+    v = clampOffset(v);
+    if (v > 0) return '＋' + v + 'px';
+    if (v < 0) return '−' + Math.abs(v) + 'px';
+    return '±0px';
+}
+
+function applyAppHeight() {
+    const off = clampOffset(settings.heightOffset);
+    settings.heightOffset = off;
+    document.documentElement.style.setProperty('--app-height', 'calc(100vh + ' + off + 'px)');
+}
+
+function setAppHeight(v) {
+    settings.heightOffset = clampOffset(v);
+    applyAppHeight();
+    const lbl = document.getElementById('set-height-label');
+    if (lbl) lbl.textContent = fmtOffset(settings.heightOffset);
+    const rng = document.getElementById('set-height');
+    if (rng && String(rng.value) !== String(settings.heightOffset)) rng.value = settings.heightOffset;
+    saveSoon();
+}
+
+function heightStep(delta) { setAppHeight(clampOffset(settings.heightOffset) + delta); }
+
+/* ---- iframe(コンテンツ)の上下位置 ---- */
+function setContentOffsetY(v) {
+    settings.contentOffsetY = clampOffset(v);
+    applyZoom();
+    const lbl = document.getElementById('set-content-y-label');
+    if (lbl) lbl.textContent = fmtOffset(settings.contentOffsetY);
+    const rng = document.getElementById('set-content-y');
+    if (rng && String(rng.value) !== String(settings.contentOffsetY)) rng.value = settings.contentOffsetY;
+    saveSoon();
+}
+
+function contentYStep(delta) { setContentOffsetY(clampOffset(settings.contentOffsetY) + delta); }
+
+function resetContentOffsetY() { setContentOffsetY(0); }
+
+/* ---- 二本指ピンチズーム ---- */
+let pinchState = null;
+let safariPinch = null;
+
+function touchDistance(t1, t2) {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy) || 1;
+}
+
+function canCustomZoom() {
+    const tab = getActiveTab();
+    return !!(settings.pinchZoom && tab && tab.frame);
+}
+
+function onPinchStart(e) {
+    if (e.touches && e.touches.length === 2 && canCustomZoom()) {
+        pinchState = { startDist: touchDistance(e.touches[0], e.touches[1]), startZoom: clampZoom(settings.zoom) };
+    } else {
+        pinchState = null;
+    }
+}
+
+function onPinchMove(e) {
+    if (!pinchState || !e.touches || e.touches.length !== 2) return;
+    const d = touchDistance(e.touches[0], e.touches[1]);
+    setZoom(pinchState.startZoom * (d / pinchState.startDist));
+    if (e.cancelable) e.preventDefault();
+}
+
+function onPinchEnd() {
+    if (pinchState) saveState();
+    pinchState = null;
+}
+
+function initZoomGestures() {
+    document.addEventListener('touchstart', onPinchStart, { passive: true });
+    document.addEventListener('touchmove', onPinchMove, { passive: false });
+    document.addEventListener('touchend', onPinchEnd, { passive: true });
+    document.addEventListener('touchcancel', onPinchEnd, { passive: true });
+
+    // Safari (iOS) の gesture イベント
+    document.addEventListener('gesturestart', e => {
+        if (!canCustomZoom()) return;
+        safariPinch = { startZoom: clampZoom(settings.zoom), startScale: e.scale || 1 };
+        e.preventDefault();
+    });
+    document.addEventListener('gesturechange', e => {
+        if (!safariPinch) return;
+        setZoom(safariPinch.startZoom * ((e.scale || 1) / safariPinch.startScale));
+        e.preventDefault();
+    });
+    document.addEventListener('gestureend', () => { if (safariPinch) saveState(); safariPinch = null; });
+
+    // PC / 確認用: Ctrl + ホイール
+    window.addEventListener('wheel', e => {
+        if (!e.ctrlKey || !canCustomZoom()) return;
+        e.preventDefault();
+        setZoom(clampZoom(settings.zoom) * (e.deltaY < 0 ? 1.1 : 0.9));
+    }, { passive: false });
+
+    window.addEventListener('resize', () => { applyZoom(); });
+    window.addEventListener('orientationchange', () => { setTimeout(() => applyZoom(), 250); });
+}
+
 function createTabObject(url, id = Date.now(), title = "読み込み中...", history = null, hIndex = 0) {
     if (url === "newtab://") title = "新しいタブ";
-    const tab = { id, url, title, history: history || [url], historyIndex: hIndex, element: null };
+    const tab = { id, url, title, history: history || [url], historyIndex: hIndex, element: null, frame: null, spacer: null };
     updateTabElement(tab);
     tabs.push(tab);
     return tab;
@@ -792,6 +1125,8 @@ function createTabObject(url, id = Date.now(), title = "読み込み中...", his
 
 function updateTabElement(tab) {
     if (tab.element) tab.element.remove();
+    tab.frame = null;
+    tab.spacer = null;
     const viewArea = document.getElementById('view');
     let el;
 
@@ -817,20 +1152,28 @@ function updateTabElement(tab) {
         renderCookiesInto(el);
     } else {
         const finalUrl = getEffectiveUrl(tab.url);
+        const wrap = document.createElement('div');
+        wrap.className = "page-element frame-wrap";
+        let frame;
         if (settings.viewMode === "iframe") {
-            el = document.createElement('iframe');
-            el.src = finalUrl;
-            el.setAttribute("sandbox", getSandbox());
+            frame = document.createElement('iframe');
+            frame.setAttribute("sandbox", getSandbox());
         } else {
-            el = document.createElement(settings.viewMode === "object" ? "object" : "embed");
-            el.src = finalUrl; el.data = finalUrl; el.type = "text/html";
+            frame = document.createElement(settings.viewMode === "object" ? "object" : "embed");
+            frame.type = "text/html";
+            frame.data = finalUrl;
         }
-        el.className = "page-element";
+        frame.className = "frame-el";
+        frame.src = finalUrl;
+        wrap.appendChild(frame);
+        el = wrap;
+        tab.frame = frame;
         setProgress(30);
-        el.onload = () => {
+        frame.onload = () => {
             setProgress(100);
-            try { tab.title = el.contentDocument.title || new URL(tab.url).hostname; }
+            try { tab.title = frame.contentDocument.title || new URL(tab.url).hostname; }
             catch(e) { tab.title = tab.url.replace(/https?:\/\//, '').split('/')[0]; }
+            applyZoom(tab);
             updateStarUI(); saveState();
             if (document.getElementById('tab-switcher').classList.contains('active')) renderTabGrid();
         };
@@ -839,6 +1182,7 @@ function updateTabElement(tab) {
     if (tab.id === activeTabId) el.classList.add('active');
     viewArea.appendChild(el);
     tab.element = el;
+    if (tab.frame) applyZoom(tab);
 }
 
 function switchTab(id) {
@@ -850,7 +1194,10 @@ function switchTab(id) {
         t.element.classList.toggle('active', active);
         if (active) {
             document.getElementById('url').value = t.url;
-            requestAnimationFrame(() => { if (t.element) t.element.scrollTop = t.element._st || 0; });
+            requestAnimationFrame(() => {
+                if (t.element) t.element.scrollTop = t.element._st || 0;
+                applyZoom(t);
+            });
         }
     });
     updateNavButtons(); updateStarUI(); saveState();
@@ -1215,6 +1562,120 @@ function renderSettingsInto(container) {
             <button class="btn" onclick="settings.bookmarks.splice(${i},1);saveState();renderSettingsInto(document.querySelector('.settings-page'));renderBookmarkBar();">削除</button>
           </div>`).join('');
 
+    const zoom = clampZoom(settings.zoom);
+    const off  = clampOffset(settings.heightOffset);
+    const offY = clampOffset(settings.contentOffsetY);
+
+    const zoomCard = `
+        <div class="card">
+            <h3>🔍 ズーム（拡大率 1〜500%）</h3>
+            <div class="range-row">
+                <span class="range-bound">1%</span>
+                <input type="range" id="set-zoom" min="1" max="500" step="1" value="${zoom}" oninput="setZoom(this.value)">
+                <span class="range-bound">500%</span>
+            </div>
+            <div class="range-value" id="set-zoom-label">${zoom}%</div>
+            <div class="preset-group">
+                <button class="btn" onclick="zoomStep(-50)">−50</button>
+                <button class="btn" onclick="zoomStep(-10)">−10</button>
+                <button class="btn" onclick="zoomStep(-1)">−1</button>
+                <button class="btn" onclick="setZoom(100)">100%</button>
+                <button class="btn" onclick="zoomStep(1)">＋1</button>
+                <button class="btn" onclick="zoomStep(10)">＋10</button>
+                <button class="btn" onclick="zoomStep(50)">＋50</button>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-top:14px;">
+                <input type="checkbox" ${settings.zoomFit ? 'checked' : ''} onchange="settings.zoomFit=this.checked;saveState();applyZoom();updateZoomUI();">
+                サイトの横幅を画面に合わせる（自動フィット）
+            </label>
+            <p class="hint">ON：拡大しても横幅が画面に収まるように中のサイトを再レイアウトします。OFF：画面幅は固定のまま拡大し、はみ出した部分はスクロールできます。</p>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-top:14px;">
+                <input type="checkbox" ${settings.pinchZoom ? 'checked' : ''} onchange="settings.pinchZoom=this.checked;saveState();">
+                二本指ズーム（ピンチ）を使う
+            </label>
+            <p class="hint">画面を2本指でつまむと拡大率を変更できます。ツールバーの ⋮ →「ズーム」でも操作できます。</p>
+        </div>`;
+
+    const heightCard = `
+        <div class="card">
+            <h3>📐 画面の高さ（±0 基準）</h3>
+            <div class="range-row">
+                <span class="range-bound">−400px</span>
+                <input type="range" id="set-height" min="-400" max="400" step="1" value="${off}" oninput="setAppHeight(this.value)">
+                <span class="range-bound">＋400px</span>
+            </div>
+            <div class="range-value" id="set-height-label">${fmtOffset(off)}</div>
+            <div class="preset-group">
+                <button class="btn" onclick="heightStep(-50)">−50</button>
+                <button class="btn" onclick="heightStep(-10)">−10</button>
+                <button class="btn" onclick="heightStep(-1)">−1</button>
+                <button class="btn" onclick="setAppHeight(0)">±0</button>
+                <button class="btn" onclick="heightStep(1)">＋1</button>
+                <button class="btn" onclick="heightStep(10)">＋10</button>
+                <button class="btn" onclick="heightStep(50)">＋50</button>
+            </div>
+            <p class="hint">±0 で画面ぴったり。<b>＋</b>で全体が下に伸びて（はみ出した分はスクロールできます）、<b>−</b>で下に余白ができて全体が上に縮みます。PWAでツールバーが隠れる／余白ができるときに調整してください。</p>
+        </div>`;
+
+    const offsetCard = `
+        <div class="card">
+            <h3>📏 コンテンツ（iframe）の上下位置</h3>
+            <div class="range-row">
+                <span class="range-bound">−400px</span>
+                <input type="range" id="set-content-y" min="-400" max="400" step="1" value="${offY}" oninput="setContentOffsetY(this.value)">
+                <span class="range-bound">＋400px</span>
+            </div>
+            <div class="range-value" id="set-content-y-label">${fmtOffset(offY)}</div>
+            <div class="preset-group">
+                <button class="btn" onclick="contentYStep(-50)">−50</button>
+                <button class="btn" onclick="contentYStep(-10)">−10</button>
+                <button class="btn" onclick="contentYStep(-1)">−1</button>
+                <button class="btn" onclick="setContentOffsetY(0)">±0</button>
+                <button class="btn" onclick="contentYStep(1)">＋1</button>
+                <button class="btn" onclick="contentYStep(10)">＋10</button>
+                <button class="btn" onclick="contentYStep(50)">＋50</button>
+            </div>
+            <p class="hint"><b>＋</b>でiframeを下へ移動します（ステータスバーやノッチで上部が欠けるときに調整）。下端に合わせて高さも自動調整するので、内容が隠れずにスクロールできます。<b>−</b>で上へ移動します。</p>
+        </div>`;
+
+    const ioCard = `
+        <div class="card">
+            <h3>📦 インポート / エクスポート</h3>
+            <p class="hint" style="margin-top:0;">エクスポートする項目を選んでください（チェックした項目だけ書き出します）。</p>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-bottom:8px;">
+                <input type="checkbox" id="ex-tabs" checked> 開いているタブ
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-bottom:8px;">
+                <input type="checkbox" id="ex-history" checked> 履歴
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-bottom:8px;">
+                <input type="checkbox" id="ex-bookmarks" checked> ブックマーク
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-bottom:8px;">
+                <input type="checkbox" id="ex-settings" checked> 設定（ホーム・ズーム・プロキシなど）
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+                <input type="checkbox" id="ex-profiles"> プロファイル（他のプロファイルのデータも含む）
+            </label>
+            <div class="preset-group" style="margin-top:14px;">
+                <button class="btn" onclick="exportSelected()">📤 選択項目をエクスポート</button>
+                <button class="btn" onclick="showSelectedJSON()">📋 JSONを表示</button>
+                <button class="btn" onclick="exportBackup()">💾 全部バックアップ</button>
+            </div>
+            <hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;">
+            <label style="font-size:14px;font-weight:bold;">インポート時の動作</label>
+            <select id="import-mode" style="margin-top:8px;">
+                <option value="merge">追加（既存データにマージ）</option>
+                <option value="replace">置き換え（既存データを削除）</option>
+            </select>
+            <div class="preset-group" style="margin-top:8px;">
+                <button class="btn" onclick="document.getElementById('import-file').click()">📥 ファイルからインポート</button>
+                <button class="btn" onclick="openJSONModal('JSONを貼り付けてインポート','')">📥 JSONを貼り付け</button>
+            </div>
+            <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="handleImportFile(this)">
+            <p class="hint">「ファイルからインポート」で開けない場合は「JSONを貼り付け」にコピー内容を貼り付けてください。プロファイルを含むファイルは、確認後に全データを復元して再読み込みします。</p>
+        </div>`;
+
     container.innerHTML = `
         <h2 style="margin-top:0;">⚙️ 設定</h2>
         <div class="card">
@@ -1223,6 +1684,10 @@ function renderSettingsInto(container) {
             <button class="btn" onclick="openProfileModal()" style="margin-top:4px;">＋ 新規プロファイル</button>
         </div>
         <div class="card"><h3>★ ブックマーク管理</h3>${bmsHtml}</div>
+        ${zoomCard}
+        ${heightCard}
+        ${offsetCard}
+        ${ioCard}
         <div class="card">
             <h3>🏠 ホーム設定</h3>
             <input type="text" id="set-home" value="${esc(settings.homeUrl)}">
@@ -1278,6 +1743,8 @@ function renderSettingsInto(container) {
         b.onclick = () => { document.getElementById('set-home').value = p.url; settings.homeUrl = p.url; saveState(); };
         container.querySelector('#plist').appendChild(b);
     });
+
+    updateZoomUI();
 }
 
 window.setToolbarPosition = (pos) => {
@@ -1287,6 +1754,7 @@ window.setToolbarPosition = (pos) => {
     document.body.classList.add('toolbar-' + pos);
     const sp = document.querySelector('.settings-page');
     if (sp) renderSettingsInto(sp);
+    applyZoom();
 };
 
 window.toggleTor = () => {
@@ -1305,6 +1773,294 @@ window.toggleProxy = (id) => {
 };
 
 /* ======================================================
+   インポート / エクスポート
+====================================================== */
+function stamp() {
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+function readJSON(key, fallback) {
+    try {
+        const v = JSON.parse(localStorage.getItem(key));
+        return (v === null || v === undefined) ? fallback : v;
+    } catch(e) { return fallback; }
+}
+
+function serializeTabs() {
+    return tabs.map(t => ({
+        id: t.id, url: t.url, title: t.title,
+        history: t.history, historyIndex: t.historyIndex,
+        active: t.id === activeTabId
+    }));
+}
+
+/* すべてのプロファイルの保存データを集める（現在のプロファイルはメモリ上の最新値を使う） */
+function collectProfileData() {
+    const out = {};
+    profiles.forEach(p => {
+        if (p.id === activeProfileId) {
+            out[p.id] = {
+                settings: JSON.parse(JSON.stringify(settings)),
+                tabs: serializeTabs(),
+                lastActive: activeTabId
+            };
+        } else {
+            out[p.id] = {
+                settings: readJSON(pkFor(p.id, 'settings'), {}),
+                tabs: readJSON(pkFor(p.id, 'sessions'), []),
+                lastActive: readJSON(pkFor(p.id, 'last-active'), null)
+            };
+        }
+    });
+    return out;
+}
+
+function collectExportSections() {
+    const el = id => document.getElementById(id);
+    return {
+        tabs:      !!(el('ex-tabs')      && el('ex-tabs').checked),
+        history:   !!(el('ex-history')   && el('ex-history').checked),
+        bookmarks: !!(el('ex-bookmarks') && el('ex-bookmarks').checked),
+        settings:  !!(el('ex-settings')  && el('ex-settings').checked),
+        profiles:  !!(el('ex-profiles')  && el('ex-profiles').checked)
+    };
+}
+
+function buildExport(sections, kind) {
+    sections = sections || collectExportSections();
+    const any = sections.tabs || sections.history || sections.bookmarks || sections.settings || sections.profiles;
+    if (!any) return null;
+    const obj = {
+        app: "IBrowser",
+        kind: kind || "partial",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        profile: (profiles.find(p => p.id === activeProfileId) || {}).name || "",
+        data: {}
+    };
+    if (sections.tabs)      obj.data.tabs = serializeTabs();
+    if (sections.history)   obj.data.history = settings.history || [];
+    if (sections.bookmarks) obj.data.bookmarks = settings.bookmarks || [];
+    if (sections.settings) {
+        const { history, bookmarks, ...rest } = settings;  // 履歴/ブックマークは専用項目で書き出す
+        obj.data.settings = rest;
+    }
+    if (sections.profiles) {
+        obj.activeProfileId = activeProfileId;
+        obj.data.profiles = profiles.map(p => ({ id: p.id, name: p.name }));
+        obj.data.profilesData = collectProfileData();
+    }
+    return obj;
+}
+
+function allSections() {
+    return { tabs: true, history: true, bookmarks: true, settings: true, profiles: true };
+}
+
+function downloadText(text, filename) {
+    try {
+        const blob = new Blob([text], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 3000);
+    } catch(e) {
+        alert('ダウンロードに失敗しました。「JSONを表示」からコピーして保存してください。\n' + e.message);
+        openJSONModal('エクスポートJSON（コピー用）', text);
+    }
+}
+
+function exportSelected() {
+    const obj = buildExport();
+    if (!obj) { alert('エクスポートする項目を1つ以上選択してください'); return; }
+    downloadText(JSON.stringify(obj, null, 2), 'ibrowser-data-' + stamp() + '.json');
+}
+
+function showSelectedJSON() {
+    const obj = buildExport();
+    if (!obj) { alert('エクスポートする項目を1つ以上選択してください'); return; }
+    openJSONModal('エクスポートJSON（コピー用）', JSON.stringify(obj, null, 2));
+}
+
+function exportBackup() {
+    const obj = buildExport(allSections(), 'backup');
+    downloadText(JSON.stringify(obj, null, 2), 'ibrowser-backup-' + stamp() + '.json');
+}
+
+/* ---- 復元 ---- */
+function applyProfiles(d, mode, activeId) {
+    const replace = mode === 'replace';
+    const imported = (d.profiles || []).map(p => ({ id: p.id, name: String(p.name || 'プロファイル') })).filter(p => p.id != null);
+    if (replace) profiles = imported.slice();
+    else imported.forEach(p => { if (!profiles.some(x => String(x.id) === String(p.id))) profiles.push(p); });
+    if (!profiles.length) profiles = [{ id: 1, name: 'デフォルト' }];
+    if (!profiles.some(p => String(p.id) === String(activeProfileId))) {
+        activeProfileId = profiles[0].id;
+        setActiveProfileId(activeProfileId);
+    }
+    saveProfiles();
+
+    const pdata = d.profilesData || {};
+    imported.forEach(p => {
+        const pd = pdata[p.id] || pdata[String(p.id)];
+        if (!pd) return;
+        if (pd.settings) localStorage.setItem(pkFor(p.id, 'settings'), JSON.stringify(pd.settings));
+        if (pd.tabs) localStorage.setItem(pkFor(p.id, 'sessions'), JSON.stringify(pd.tabs));
+        if (pd.lastActive != null) localStorage.setItem(pkFor(p.id, 'last-active'), JSON.stringify(pd.lastActive));
+    });
+    if (activeId != null && profiles.some(p => String(p.id) === String(activeId))) setActiveProfileId(activeId);
+}
+
+function mergeList(current, incoming, keyFn) {
+    const seen = new Set((current || []).map(keyFn));
+    const out = (current || []).slice();
+    (incoming || []).forEach(item => {
+        const k = keyFn(item);
+        if (!seen.has(k)) { seen.add(k); out.push(item); }
+    });
+    return out;
+}
+
+function applyPartialImport(d, mode) {
+    const replace = (mode === 'replace');
+    const done = [];
+
+    if (d.settings && typeof d.settings === 'object') {
+        const { history, bookmarks, ...rest } = d.settings;
+        settings = { ...settings, ...rest };
+        done.push('設定');
+    }
+
+    if (Array.isArray(d.bookmarks)) {
+        const bms = d.bookmarks.filter(b => b && b.url);
+        settings.bookmarks = replace ? bms.slice() : mergeList(settings.bookmarks, bms, b => b.url);
+        done.push('ブックマーク ' + bms.length + '件');
+    }
+
+    if (Array.isArray(d.history)) {
+        const hs = d.history.filter(h => h && h.url);
+        let list = replace ? hs.slice() : mergeList(settings.history, hs, h => h.url + '@' + h.time);
+        list.sort((a, b) => (b.time || 0) - (a.time || 0));
+        settings.history = list.slice(0, 500);
+        done.push('履歴 ' + hs.length + '件');
+    }
+
+    if (Array.isArray(d.tabs)) {
+        const list = d.tabs.filter(t => t && t.url);
+        if (replace) {
+            tabs.slice().forEach(t => { if (t.element) t.element.remove(); });
+            tabs = []; activeTabId = null;
+        }
+        const base = Date.now();
+        let targetId = null;
+        list.forEach((t, i) => {
+            if (!replace && tabs.some(x => x.url === t.url)) return;
+            const id = base + i;
+            const created = createTabObject(t.url, id, t.title || t.url, t.history, t.historyIndex || 0);
+            if (t.active && targetId === null) targetId = created.id;
+        });
+        if (!tabs.some(t => t.id === activeTabId)) {
+            switchTab(targetId != null ? targetId : tabs[tabs.length - 1].id);
+        }
+        done.push('タブ ' + list.length + '件');
+    }
+
+    saveState();
+    setDarkMode(settings.darkMode);
+    document.body.classList.remove('toolbar-top', 'toolbar-bottom');
+    document.body.classList.add('toolbar-' + (settings.toolbarPos || 'bottom'));
+    applyAppHeight();
+    renderBookmarkBar();
+    applyZoom();
+    updateZoomUI();
+    const sp = document.querySelector('.settings-page');
+    if (sp) renderSettingsInto(sp);
+    if (document.getElementById('tab-switcher').classList.contains('active')) renderTabGrid();
+    return done;
+}
+
+function importFromText(text) {
+    let obj;
+    try { obj = JSON.parse(text); }
+    catch(e) { alert('JSONの形式が不正です'); return false; }
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { alert('対応していないJSONです'); return false; }
+
+    const d = obj.data || obj;
+    const modeEl = document.getElementById('import-mode');
+    const mode = (modeEl && modeEl.value === 'replace') ? 'replace' : 'merge';
+    const modeLabel = mode === 'replace' ? '置き換え' : '追加（マージ）';
+
+    // プロファイルを含む（全バックアップ）→ 全体を復元して再読み込み
+    if (Array.isArray(d.profiles) && d.profiles.length) {
+        const names = d.profiles.map(p => p.name).join(' / ');
+        if (!confirm(`プロファイルを含むバックアップを復元します。\n\nプロファイル: ${names}\n件数: ${d.profiles.length}\n動作: ${modeLabel}\n\n現在のデータが上書きされます。よろしいですか？`)) return false;
+        applyProfiles(d, mode, obj.activeProfileId);
+        alert('復元しました。再読み込みします。');
+        location.reload();
+        return true;
+    }
+
+    // 通常の部分インポート
+    const parts = [];
+    if (d.settings) parts.push('設定');
+    if (Array.isArray(d.bookmarks)) parts.push('ブックマーク ' + d.bookmarks.length + '件');
+    if (Array.isArray(d.history)) parts.push('履歴 ' + d.history.length + '件');
+    if (Array.isArray(d.tabs)) parts.push('タブ ' + d.tabs.length + '件');
+    if (!parts.length) { alert('インポートできるデータが見つかりませんでした'); return false; }
+
+    if (!confirm(`次のデータを「${modeLabel}」でインポートします。\n\n・${parts.join('\n・')}`)) return false;
+
+    const done = applyPartialImport(d, mode);
+    alert('インポートしました。\n\n・' + done.join('\n・'));
+    return true;
+}
+
+function handleImportFile(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { importFromText(String(reader.result || '')); input.value = ''; };
+    reader.onerror = () => { alert('ファイルを読み込めませんでした'); input.value = ''; };
+    reader.readAsText(file);
+}
+
+/* ---- JSON モーダル ---- */
+function openJSONModal(title, text) {
+    document.getElementById('json-modal-title').textContent = title;
+    document.getElementById('json-modal-text').value = text;
+    document.getElementById('json-modal').classList.add('open');
+}
+function closeJSONModal() { document.getElementById('json-modal').classList.remove('open'); }
+
+function copyJSONModal() {
+    const ta = document.getElementById('json-modal-text');
+    if (!ta.value) { alert('コピーする内容がありません'); return; }
+    ta.focus(); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch(e) { ok = false; }
+    if (ok) { alert('コピーしました'); return; }
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(ta.value)
+            .then(() => alert('コピーしました'))
+            .catch(() => alert('コピーできませんでした。手動で選択してコピーしてください。'));
+    } else {
+        alert('コピーできませんでした。手動で選択してコピーしてください。');
+    }
+}
+
+function importFromModal() {
+    const text = document.getElementById('json-modal-text').value.trim();
+    if (!text) { alert('JSONが空です'); return; }
+    if (importFromText(text)) closeJSONModal();
+}
+
+/* ======================================================
    メニュー
 ====================================================== */
 function toggleMenu() {
@@ -1313,11 +2069,17 @@ function toggleMenu() {
 }
 
 function toggleDarkMode() {
-    settings.darkMode = !settings.darkMode;
-    document.body.classList.toggle('dark-mode');
+    setDarkMode(!settings.darkMode);
     saveState();
     const sp = document.querySelector('.settings-page');
     if (sp) renderSettingsInto(sp);
+}
+
+/* body と html の両方にダークモードを反映する（画面外の背景色のため） */
+function setDarkMode(on) {
+    settings.darkMode = !!on;
+    document.body.classList.toggle('dark-mode', !!on);
+    document.documentElement.classList.toggle('dark-mode', !!on);
 }
 
 /* ======================================================
@@ -1355,7 +2117,8 @@ document.addEventListener('click', e => {
 ====================================================== */
 function initProfile() {
     loadSettings();
-    document.body.classList.toggle('dark-mode', !!settings.darkMode);
+    setDarkMode(settings.darkMode);
+    applyAppHeight();
 
     const savedTabs = localStorage.getItem(pk('sessions'));
     if (savedTabs && JSON.parse(savedTabs).length > 0) {
@@ -1367,8 +2130,11 @@ function initProfile() {
     }
     setToolbarPosition(settings.toolbarPos || 'bottom');
     renderBookmarkBar();
+    updateZoomUI();
+    applyZoom();
 }
 
+initZoomGestures();
 initProfile();
 </script>
 </body>
